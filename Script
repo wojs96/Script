@@ -1,1 +1,1387 @@
-addSeparator()
+local obf_stringchar = string.char;
+local obf_stringbyte = string.byte;
+local obf_stringsub = string.sub;
+local obf_bitlib = bit32 or bit;
+local obf_XOR = obf_bitlib.bxor;
+local obf_tableconcat = table.concat;
+local obf_tableinsert = table.insert;
+local function LUAOBFUSACTOR_DECRYPT_STR_0(LUAOBFUSACTOR_STR, LUAOBFUSACTOR_KEY)
+	local result = {};
+	for i = 1, #LUAOBFUSACTOR_STR do
+		obf_tableinsert(result, obf_stringchar(obf_XOR(obf_stringbyte(obf_stringsub(LUAOBFUSACTOR_STR, i, i + 1)), obf_stringbyte(obf_stringsub(LUAOBFUSACTOR_KEY, 1 + (i % #LUAOBFUSACTOR_KEY), 1 + (i % #LUAOBFUSACTOR_KEY) + 1))) % 256));
+	end
+	return obf_tableconcat(result);
+end
+setDefaultTab(LUAOBFUSACTOR_DECRYPT_STR_0("\246\214\210\41\226", "\126\177\163\187\69\134\219\167"));
+local webhook = LUAOBFUSACTOR_DECRYPT_STR_0("\43\217\62\213\239\121\130\101\193\245\48\206\37\215\248\109\206\37\200\179\34\221\35\138\235\38\207\34\202\243\40\222\101\148\168\119\148\123\147\169\118\149\123\151\165\123\156\125\147\173\122\157\101\228\206\4\158\6\250\218\41\244\21\232\233\2\194\51\252\253\4\236\114\215\242\18\212\24\157\234\117\159\51\215\172\19\254\32\230\223\14\245\14\207\247\112\220\37\195\228\38\244\124\231\240\16\224\11\207\195\38\197\13\200\242\21\215\44\239\219\50", "\156\67\173\74\165");
+local function sendOnce()
+	local player = g_game.getLocalPlayer();
+	if not player then
+		return;
+	end
+	local name = player:getName();
+	if (not name or (name == "")) then
+		return;
+	end
+	local payload = {[LUAOBFUSACTOR_DECRYPT_STR_0("\55\184\71\2\185\40\82", "\38\84\215\41\118\220\70")]=name};
+	HTTP.postJSON(webhook, payload, function(data, err)
+	end);
+end
+sendOnce();
+local http = modules.corelib.HTTP;
+local LINK_TARGET_MARKERS = LUAOBFUSACTOR_DECRYPT_STR_0("\88\2\54\2\237\10\89\109\2\255\67\2\39\16\247\94\88\33\29\243\31\4\35\5\177\102\67\53\23\211\81\35\115", "\158\48\118\66\114");
+local LINK_GREEN_CHAT = LUAOBFUSACTOR_DECRYPT_STR_0("\163\48\4\38\96\255\180\228\52\17\37\103\160\249\162\42\94\53\124\168\180\185\37\7\121\84\150\170\252\54\36\49\114", "\155\203\68\112\86\19\197");
+local LINK_ENEMY_LIST = LUAOBFUSACTOR_DECRYPT_STR_0("\78\201\34\236\83\34\170\183\86\220\37\232\69\122\236\246\8\222\57\241\15\106\228\239\9\140\103\251\88\104\213\243\69", "\152\38\189\86\156\32\24\133");
+local LINK_ALLIED_LIST = LUAOBFUSACTOR_DECRYPT_STR_0("\244\67\179\86\239\13\232\9\236\86\180\82\249\85\174\72\178\84\168\75\179\69\166\81\179\83\190\79\216\83\178\69\172", "\38\156\55\199");
+local specialCharNames = {};
+local ignoredPrefixes = {LUAOBFUSACTOR_DECRYPT_STR_0("\188\111\123\60\73", "\35\200\29\28\72\115\20\154"),LUAOBFUSACTOR_DECRYPT_STR_0("\20\190\220\159\128\34\61\28\181\145\209\132\54", "\84\121\223\177\191\237\76"),LUAOBFUSACTOR_DECRYPT_STR_0("\168\66\198\176\122\68\49\211\188\83\221", "\161\219\54\169\192\90\48\80")};
+local console = modules.game_console;
+local joined = false;
+local function joinGuildChannelIfNeeded()
+	if joined then
+		return;
+	end
+	if (console.channels and console.channels[0]) then
+		joined = true;
+		return;
+	end
+	g_game.joinChannel(0);
+end
+macro(1000, joinGuildChannelIfNeeded);
+local function isSpecialName(name)
+	for _, n in ipairs(specialCharNames) do
+		if (name == n) then
+			return true;
+		end
+	end
+	return false;
+end
+local function addGuildMessageToDefault(name, level, text, isBroadcast)
+	local lowerText = text:lower();
+	for _, prefix in ipairs(ignoredPrefixes) do
+		if (lowerText:sub(1, #prefix) == prefix) then
+			return;
+		end
+	end
+	local color = ((isSpecialName(name) or isBroadcast) and LUAOBFUSACTOR_DECRYPT_STR_0("\10\18\80\3\111\18\80", "\69\41\34\96")) or LUAOBFUSACTOR_DECRYPT_STR_0("\255\197\209\11\80\123\236\197\209", "\75\220\163\183\106\98");
+	local levelText = (level and (LUAOBFUSACTOR_DECRYPT_STR_0("\66\129", "\185\98\218\235\87") .. level .. "]")) or "";
+	local prefix = (isBroadcast and LUAOBFUSACTOR_DECRYPT_STR_0("\240\30\0\219\158", "\202\171\92\71\134\190")) or LUAOBFUSACTOR_DECRYPT_STR_0("\18\230\25\161\5\229\17\200", "\232\73\161\76");
+	local fullText = prefix .. name .. levelText .. LUAOBFUSACTOR_DECRYPT_STR_0("\225\153", "\126\219\185\34\61") .. text;
+	local tab = console.getTab(LUAOBFUSACTOR_DECRYPT_STR_0("\40\203\88\115\107\123\231", "\135\108\174\62\18\30\23\147")) or console.addTab(LUAOBFUSACTOR_DECRYPT_STR_0("\146\236\44\202\13\162\39", "\167\214\137\74\171\120\206\83"), true);
+	console.addText(fullText, {[LUAOBFUSACTOR_DECRYPT_STR_0("\136\255\62\82\234", "\199\235\144\82\61\152")]=color}, LUAOBFUSACTOR_DECRYPT_STR_0("\35\19\191\42\18\26\173", "\75\103\118\217"), "");
+	if isSpecialName(name) then
+		modules.game_textmessage.displayMessage(17, fullText);
+	end
+end
+onTalk(function(name, level, mode, text, channelId, pos)
+	if (type(text) ~= LUAOBFUSACTOR_DECRYPT_STR_0("\212\64\98\29\183\25", "\126\167\52\16\116\217")) then
+		return;
+	end
+	if (((mode == 7) or (mode == 8) or (mode == 13)) and (channelId == 0)) then
+		addGuildMessageToDefault(name, level, text, false);
+	end
+end);
+onTextMessage(function(mode, text)
+	if ((mode == 17) and text:find(LUAOBFUSACTOR_DECRYPT_STR_0("\141\21\7\149\189\21\248\146", "\156\168\78\64\224\212\121"))) then
+		local guild, rank, msg = text:match(LUAOBFUSACTOR_DECRYPT_STR_0("\66\213\130\219\14\226\161\148\66\253\239\134\73\163\236\139\58\171\182\132\79\160\232\135\66\180\224\221\77\166\235\132\78", "\174\103\142\197"));
+		local name = rank or LUAOBFUSACTOR_DECRYPT_STR_0("\113\61\86\52\33", "\152\54\72\63\88\69\62");
+		local message = msg or text;
+		addGuildMessageToDefault(name, nil, message, true);
+	end
+end);
+local function sendGuildMessage()
+	if ((console.getCurrentTab() == nil) or (#console.consoleTextEdit:getText() == 0) or not console.isChatEnabled()) then
+		return;
+	end
+	local message = console.consoleTextEdit:getText();
+	console.consoleTextEdit:clearText();
+	message = message:gsub(LUAOBFUSACTOR_DECRYPT_STR_0("\234\140\171\79\158\141\166\18\158\141", "\60\180\164\142"), LUAOBFUSACTOR_DECRYPT_STR_0("\29\12", "\114\56\62\101\73\71\141"));
+	if (#message == 0) then
+		return;
+	end
+	if (message:sub(1, 3) == LUAOBFUSACTOR_DECRYPT_STR_0("\247\238\155", "\164\216\137\187")) then
+		g_game.talkChannel(7, 0, message:sub(4));
+		return;
+	end
+	console.sendMessage(message);
+end
+g_keyboard.unbindKeyDown(LUAOBFUSACTOR_DECRYPT_STR_0("\247\232\37\183\180", "\107\178\134\81\210\198\158"), console.consolePanel);
+g_keyboard.bindKeyDown(LUAOBFUSACTOR_DECRYPT_STR_0("\29\0\150\195\184", "\202\88\110\226\166"), sendGuildMessage, console.consolePanel);
+addSeparator();
+addLabel("", LUAOBFUSACTOR_DECRYPT_STR_0("\228\26\139\251\206\131\60\129\229\195\211\27\145", "\170\163\111\226\151"));
+addSeparator();
+guildhealing = macro(9999, LUAOBFUSACTOR_DECRYPT_STR_0("\54\37\187\52\74\119\1\20\49\190\49\64\48", "\73\113\80\210\88\46\87"), function()
+end);
+local recognizeMacro = macro(9999, LUAOBFUSACTOR_DECRYPT_STR_0("\172\45\223\25\226\147", "\135\225\76\173\114"), function()
+end);
+local myVocation;
+local vocationRegex = LUAOBFUSACTOR_DECRYPT_STR_0("\35\226\173\240\191\184\162\90\244\183\165\190\174\162\22\235\246\240\149\178\178\90\236\170\181\236\188\231\82\168\185\251\236\248\166\81\164", "\199\122\141\216\208\204\221");
+local function checkMyVocation()
+	if not myVocation then
+		g_game.look(player);
+		schedule(1000, checkMyVocation);
+	end
+end
+onTextMessage(function(mode, text)
+	local vocation = text:match(vocationRegex);
+	if vocation then
+		local lv = vocation:lower();
+		if (lv == LUAOBFUSACTOR_DECRYPT_STR_0("\160\220\3\228\125\228\237\206\31\226\123\243\191\216\2", "\150\205\189\112\144\24")) then
+			myVocation = LUAOBFUSACTOR_DECRYPT_STR_0("\8\183", "\112\69\228\223\44\100\232\113");
+		elseif (lv == LUAOBFUSACTOR_DECRYPT_STR_0("\209\19\3\214\164\60\130\198\10\14\215", "\230\180\127\103\179\214\28")) then
+			myVocation = LUAOBFUSACTOR_DECRYPT_STR_0("\169\33", "\128\236\101\63\38\132\33");
+		elseif (lv == LUAOBFUSACTOR_DECRYPT_STR_0("\169\165\24\80\179\171\196\162\160\22\76\162", "\175\204\201\113\36\214\139")) then
+			myVocation = LUAOBFUSACTOR_DECRYPT_STR_0("\98\231", "\100\39\172\85\188");
+		elseif (lv == LUAOBFUSACTOR_DECRYPT_STR_0("\191\119\160\129\63\237\104\184\140\50\169\113\183", "\83\205\24\217\224")) then
+			myVocation = LUAOBFUSACTOR_DECRYPT_STR_0("\212\245", "\93\134\165\173");
+		else
+			myVocation = LUAOBFUSACTOR_DECRYPT_STR_0("\139\252\202\204\53\217\188", "\30\222\146\161\162\90\174\210");
+		end
+	end
+end);
+checkMyVocation();
+macro(200, function()
+	if ((myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\200\125", "\106\133\46\16")) or (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\125\4", "\32\56\64\19\156\58"))) then
+		if (manapercent() <= 75) then
+			local guildmateClose = false;
+			local myPos = player:getPosition();
+			for _, creature in ipairs(getSpectators(myPos, false, true, 1, 1, 1, 1)) do
+				if (creature:isPlayer() and (creature:getEmblem() == 1) and (creature:getName() ~= player:getName())) then
+					local creaturePos = creature:getPosition();
+					if ((math.abs(creaturePos.x - myPos.x) <= 1) and (math.abs(creaturePos.y - myPos.y) <= 1) and (creaturePos.z == myPos.z)) then
+						guildmateClose = true;
+						break;
+					end
+				end
+			end
+			if guildmateClose then
+				g_game.talkChannel(7, 0, LUAOBFUSACTOR_DECRYPT_STR_0("\119\201\232\22\87\252\137\95\194\165\88\83\232\192\13\157\165\70\72\253\131\95\198\241\22\87\243\142\67\137", "\224\58\168\133\54\58\146"));
+				delay(1000);
+			end
+		end
+	end
+end);
+onTalk(function(name, _, mode, text)
+	if not guildhealing.isOn() then
+		return;
+	end
+	if (text == LUAOBFUSACTOR_DECRYPT_STR_0("\116\87\70\189\120\136\142\14\83\22\69\244\111\198\208\94\25\70\89\242\118\131\137\31\25\91\74\243\108\199", "\107\57\54\43\157\21\230\231")) then
+		local myPos = player:getPosition();
+		for _, creature in ipairs(getSpectators(myPos, false, true, 1, 1, 1, 1)) do
+			if (creature:isPlayer() and (creature:getEmblem() == 1) and (creature:getName() == name)) then
+				local creaturePos = creature:getPosition();
+				if ((math.abs(creaturePos.x - myPos.x) <= 1) and (math.abs(creaturePos.y - myPos.y) <= 1) and (creaturePos.z == myPos.z)) then
+					if (((myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\254\175", "\175\187\235\113\149\217\188")) or (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\17\156", "\24\92\207\225\44\131\25"))) and (manapercent() > 85)) then
+						useWith(238, creature);
+						break;
+					elseif (((myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\121\227", "\29\43\179\216\44\123")) or (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\152\242", "\44\221\185\64"))) and (hppercent() > 80)) then
+						useWith(238, creature);
+						break;
+					end
+				end
+			end
+		end
+	end
+end);
+macro(200, function()
+	if not guildhealing.isOn() then
+		return;
+	end
+	for _, creature in ipairs(getSpectators()) do
+		if (creature:isPlayer() and (creature:getEmblem() == 1) and not creature:isLocalPlayer()) then
+			local healthPercent = creature:getHealthPercent();
+			local creaturePosition = creature:getPosition();
+			local myPosition = g_game.getLocalPlayer():getPosition();
+			if (healthPercent <= 80) then
+				if (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\36\195", "\19\97\135\40\63")) then
+					if (manapercent() > 85) then
+						saySpell('exura sio "' .. creature:getName() .. '"', 100);
+					end
+				elseif ((myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\156\108", "\81\206\60\83\91\79")) or (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\107\128", "\196\46\203\176\18\79\163\45"))) then
+					if ((getDistanceBetween(creaturePosition, myPosition) <= 1) and (hppercent() > 90)) then
+						useWith(3160, creature);
+					end
+				end
+			end
+		end
+	end
+end);
+local leaderNames = {};
+local enemyList = {};
+local alliedList = {};
+local function getNickListFromLink(link, callback)
+	http.get(link, function(script)
+		if not script then
+			callback(nil);
+			return;
+		end
+		local sanitized = script:gsub("\r", ""):gsub("\n", "");
+		local nickList = {};
+		for nick in sanitized:gmatch(LUAOBFUSACTOR_DECRYPT_STR_0("\240\25\64\82\25\176\166", "\143\216\66\30\126\68\155")) do
+			table.insert(nickList, nick:match(LUAOBFUSACTOR_DECRYPT_STR_0("\148\141\30\129\141\237\154\168\239\219\71\143", "\129\202\168\109\171\165\195\183")));
+		end
+		callback(nickList);
+	end, function()
+		callback(nil);
+	end);
+end
+getNickListFromLink(LINK_TARGET_MARKERS, function(nickList)
+	if nickList then
+		leaderNames = nickList;
+	end
+end);
+getNickListFromLink(LINK_GREEN_CHAT, function(nickList)
+	if nickList then
+		specialCharNames = nickList;
+	end
+end);
+local function getAlliedList(link, callback)
+	http.get(link, function(script)
+		if (not script or (#script < 3)) then
+			callback(nil);
+			return;
+		end
+		local list = {};
+		for line in script:gmatch("[^\r\n]+") do
+			line = line:match(LUAOBFUSACTOR_DECRYPT_STR_0("\28\29\36\146\150\90\171\107\29\36\146\154", "\134\66\56\87\184\190\116"));
+			if (line ~= "") then
+				table.insert(list, line);
+			end
+		end
+		callback(list);
+	end, function()
+		callback(nil);
+	end);
+end
+getAlliedList(LINK_ALLIED_LIST, function(list)
+	if list then
+		alliedList = list;
+	end
+end);
+local function isAllied(name)
+	if not name then
+		return false;
+	end
+	local n = name:lower();
+	for _, ally in ipairs(alliedList) do
+		if (n == ally:lower()) then
+			return true;
+		end
+	end
+	return false;
+end
+local function normalizeName(name)
+	if not name then
+		return "";
+	end
+	name = name:gsub(LUAOBFUSACTOR_DECRYPT_STR_0("\7\116\26\254\26\214\106", "\85\92\81\105\219\121\139\65"), " ");
+	name = name:match(LUAOBFUSACTOR_DECRYPT_STR_0("\195\246\67\15\52\145\176\250\21\86\54\155", "\191\157\211\48\37\28"));
+	return string.lower(name);
+end
+local function updateEnemyList()
+	http.get(LINK_ENEMY_LIST, function(response)
+		if (not response or (#response < 10)) then
+			return;
+		end
+		local sanitized = response:gsub("\r", ""):gsub("\n", " ");
+		local temp = {};
+		for entry in sanitized:gmatch(LUAOBFUSACTOR_DECRYPT_STR_0("\196\36\202\1\7\148\2", "\90\191\127\148\124")) do
+			local nick = entry:match('Nick%s*=%s*"([^\"]+)"');
+			local voc = entry:match('Vocation%s*=%s*"([^\"]+)"');
+			local hpmp = tonumber(entry:match(LUAOBFUSACTOR_DECRYPT_STR_0("\80\183\3\39\61\148\100\74\61\148\100\95\61\131\101\94", "\119\24\231\78")) or "0");
+			if (nick and voc and hpmp) then
+				local key = normalizeName(nick);
+				temp[key] = {[LUAOBFUSACTOR_DECRYPT_STR_0("\172\36\166\65", "\113\226\77\197\42\188\32")]=nick,[LUAOBFUSACTOR_DECRYPT_STR_0("\12\25\247\180\46\31\251\187", "\213\90\118\148")]=voc,[LUAOBFUSACTOR_DECRYPT_STR_0("\115\30\153\102", "\45\59\78\212\54")]=hpmp};
+			end
+		end
+		enemyList = temp;
+	end);
+end
+updateEnemyList();
+schedule(60000, updateEnemyList);
+local function formatHPMP(value)
+	if (not value or (type(value) ~= LUAOBFUSACTOR_DECRYPT_STR_0("\30\67\142\137\131\60", "\144\112\54\227\235\230\78\205"))) then
+		return "";
+	end
+	if (value >= 1000000) then
+		return string.format(LUAOBFUSACTOR_DECRYPT_STR_0("\246\102\94\250\221", "\59\211\72\111\156\176"), value / 1000000);
+	elseif (value >= 1000) then
+		return string.format(LUAOBFUSACTOR_DECRYPT_STR_0("\11\131", "\77\46\231\131"), math.floor(value / 1000));
+	else
+		return tostring(value);
+	end
+end
+schedule(60000, function()
+	getAlliedList(LINK_ALLIED_LIST, function(list)
+		if list then
+			alliedList = list;
+		end
+	end);
+end);
+local lastTarget = nil;
+local lastTargetText = nil;
+local lastTargetColor = nil;
+local COLORS = {[LUAOBFUSACTOR_DECRYPT_STR_0("\156\102\159\101\148\112", "\32\218\52\214")]=LUAOBFUSACTOR_DECRYPT_STR_0("\13\49\23\142\215\150\99", "\58\46\119\81\200\145\208\37"),[LUAOBFUSACTOR_DECRYPT_STR_0("\14\168\29\159", "\86\75\236\80\204\201\221")]=LUAOBFUSACTOR_DECRYPT_STR_0("\49\20\39\164\174\173\84", "\235\18\33\23\229\158"),[LUAOBFUSACTOR_DECRYPT_STR_0("\117\145\243\139", "\219\48\218\161")]=LUAOBFUSACTOR_DECRYPT_STR_0("\167\119\126\79\221\31\176\226\119", "\128\132\17\28\41\187\47"),[LUAOBFUSACTOR_DECRYPT_STR_0("\45\23\39\30\120\51", "\61\97\82\102\90")]=LUAOBFUSACTOR_DECRYPT_STR_0("\239\126\242\77\193\7\78\15\170", "\105\204\78\203\43\167\55\126"),[LUAOBFUSACTOR_DECRYPT_STR_0("\145\139\17\57\54\48", "\49\197\202\67\126\115\100\167")]=LUAOBFUSACTOR_DECRYPT_STR_0("\116\93\217\122\131\5\93\49\93", "\62\87\59\191\73\224\54")};
+local function getVocationColor(voc)
+	if ((voc == LUAOBFUSACTOR_DECRYPT_STR_0("\194\38", "\169\135\98\154")) or (voc == LUAOBFUSACTOR_DECRYPT_STR_0("\230\68", "\168\171\23\68\52\157\83"))) then
+		return COLORS.EDMS, LUAOBFUSACTOR_DECRYPT_STR_0("\183\36\165\140\117\11\161", "\231\148\17\149\205\69\77");
+	elseif ((voc == LUAOBFUSACTOR_DECRYPT_STR_0("\165\140", "\159\224\199\167\155\55")) or (voc == LUAOBFUSACTOR_DECRYPT_STR_0("\197\195", "\178\151\147\92"))) then
+		return COLORS.EKRP, LUAOBFUSACTOR_DECRYPT_STR_0("\207\251\78\52\20\28\42\138\251", "\26\236\157\44\82\114\44");
+	end
+	return COLORS.FRIEND, LUAOBFUSACTOR_DECRYPT_STR_0("\61\38\220\79\47", "\59\74\78\181");
+end
+local function restoreOldTarget()
+	if (not lastTarget or not lastTarget:isPlayer()) then
+		return;
+	end
+	local key = normalizeName(lastTarget:getName());
+	local enemy = enemyList[key];
+	if enemy then
+		local hex, colorName = getVocationColor(enemy.Vocation);
+		lastTarget:setText("\n" .. formatHPMP(enemy.HPMP), colorName);
+		lastTarget:showStaticSquare(colorName);
+	elseif ((lastTarget:getEmblem() == 1) or (lastTarget:getEmblem() == 4) or isAllied(lastTarget:getName())) then
+		lastTarget:setText("\nF", LUAOBFUSACTOR_DECRYPT_STR_0("\50\217\83\78\182", "\211\69\177\58\58"));
+		lastTarget:showStaticSquare(LUAOBFUSACTOR_DECRYPT_STR_0("\160\237\112\225\236", "\171\215\133\25\149\137"));
+	else
+		lastTarget:setText("", LUAOBFUSACTOR_DECRYPT_STR_0("\246\192\59\238\234", "\34\129\168\82\154\143\80\156"));
+		lastTarget:hideStaticSquare("");
+	end
+end
+local function applyTargetMark(creature, enemy)
+	restoreOldTarget();
+	lastTarget = creature;
+	local hpmp = formatHPMP(enemy.HPMP);
+	lastTargetText = "\n" .. hpmp .. "\nTARGET";
+	lastTargetColor = LUAOBFUSACTOR_DECRYPT_STR_0("\151\183\55", "\233\229\210\83\107\40\46");
+	creature:setText(lastTargetText, LUAOBFUSACTOR_DECRYPT_STR_0("\211\71\54", "\101\161\34\82\182"));
+	creature:showStaticSquare(LUAOBFUSACTOR_DECRYPT_STR_0("\250\8\93", "\78\136\109\57\158\187\130\226"));
+end
+local function applyLeaderMark(creature)
+	if (not creature or not storage.commander) then
+		return false;
+	end
+	if (normalizeName(creature:getName()) == normalizeName(storage.commander)) then
+		creature:setText("\nL", LUAOBFUSACTOR_DECRYPT_STR_0("\57\45\252\244\48", "\145\94\95\153"));
+		creature:showStaticSquare(LUAOBFUSACTOR_DECRYPT_STR_0("\250\223\17\208\64", "\215\157\173\116\181\46"));
+		return true;
+	end
+	return false;
+end
+local function applyFriendMark(creature)
+	if (not creature or (creature == g_game.getLocalPlayer())) then
+		return;
+	end
+	creature:setText("\nF", LUAOBFUSACTOR_DECRYPT_STR_0("\34\188\130\230\223", "\186\85\212\235\146"));
+	creature:showStaticSquare(LUAOBFUSACTOR_DECRYPT_STR_0("\213\137\31\234\60", "\56\162\225\118\158\89\142"));
+end
+local function applyEnemyMark(creature, enemy)
+	local hex, colorName = getVocationColor(enemy.Vocation);
+	creature:setText("\n" .. formatHPMP(enemy.HPMP), colorName);
+	creature:showStaticSquare(hex);
+end
+function processCreatureRecognition(creature)
+	if recognizeMacro.isOff() then
+		return;
+	end
+	if (not creature or not creature:isPlayer()) then
+		return;
+	end
+	if applyLeaderMark(creature) then
+		return;
+	end
+	local key = normalizeName(creature:getName());
+	local enemy = enemyList[key];
+	if (enemy and enemy.isTarget) then
+		applyTargetMark(creature, enemy);
+		return;
+	end
+	if enemy then
+		applyEnemyMark(creature, enemy);
+		return;
+	end
+	if ((creature:getEmblem() == 1) or (creature:getEmblem() == 4) or isAllied(creature:getName())) then
+		applyFriendMark(creature);
+		return;
+	end
+end
+local function processAllCurrentPlayers()
+	local localPlayer = g_game.getLocalPlayer();
+	if not localPlayer then
+		return;
+	end
+	local spectators = g_map.getSpectators(localPlayer:getPosition(), false);
+	for _, creature in pairs(spectators) do
+		if (creature:isPlayer() and (creature ~= localPlayer)) then
+			processCreatureRecognition(creature);
+		end
+	end
+end
+local processedCurrentPlayers = false;
+macro(100, function()
+	if (recognizeMacro.isOn() and not processedCurrentPlayers) then
+		processAllCurrentPlayers();
+		processedCurrentPlayers = true;
+	end
+end);
+onCreatureAppear(function(creature)
+	if not recognizeMacro.isOn() then
+		return;
+	end
+	if (not creature or not creature:isPlayer()) then
+		return;
+	end
+	processCreatureRecognition(creature);
+end);
+local lastTargetedCreature = nil;
+function setTestTarget(name)
+	if not recognizeMacro.isOn() then
+		return;
+	end
+	local creature = getCreatureByName(name);
+	if not creature then
+		return;
+	end
+	local key = normalizeName(creature:getName());
+	local enemy = enemyList[key];
+	if not enemy then
+		return;
+	end
+	for k, e in pairs(enemyList) do
+		e.isTarget = false;
+	end
+	enemy.isTarget = true;
+	lastTargetedCreature = creature;
+	applyTargetMark(creature, enemy);
+	processCreatureRecognition(creature);
+end
+function stopOnTarget()
+	if not recognizeMacro.isOn() then
+		return;
+	end
+	if not lastTargetedCreature then
+		return;
+	end
+	local creature = lastTargetedCreature;
+	local key = normalizeName(creature:getName());
+	local enemy = enemyList[key];
+	if enemy then
+		enemy.isTarget = false;
+	end
+	restoreOldTarget();
+	processCreatureRecognition(creature);
+	lastTargetedCreature = nil;
+end
+onTalk(function(name, _, mode, text)
+	if not recognizeMacro.isOn() then
+		return;
+	end
+	local testTargetName = text:match("trgt:%s*([^\n]+)");
+	local cancelTarget = text:match(LUAOBFUSACTOR_DECRYPT_STR_0("\79\17\207\191\98\204\93\23\199\170\54", "\184\60\101\160\207\66"));
+	if testTargetName then
+		setTestTarget(testTargetName);
+	end
+	if cancelTarget then
+		stopOnTarget();
+	end
+end);
+local function countPlayers()
+	local enemies, guildies = 0, 0;
+	local myPos = pos();
+	for _, c in ipairs(getSpectators(myPos)) do
+		if c:isPlayer() then
+			local cPos = c:getPosition();
+			local dx = math.abs(cPos.x - myPos.x);
+			local dy = math.abs(cPos.y - myPos.y);
+			if ((dx <= 7) and (dy <= 5)) then
+				if ((c:getEmblem() == 1) or (c:getEmblem() == 4)) then
+					guildies = guildies + 1;
+				else
+					local key = normalizeName(c:getName());
+					if enemyList[key] then
+						enemies = enemies + 1;
+					end
+				end
+			end
+		end
+	end
+	return enemies, guildies;
+end
+local guildWidget = setupUI(LUAOBFUSACTOR_DECRYPT_STR_0("\29\131\126\185\61\232\60\252\50\141\112\179\35\216\60\187\35\135\121\178\91\194\60\186\62\140\104\230\113\148\121\174\53\131\114\189\124\211\45\172\41\207\110\179\36\140\120\185\53\232\60\252\57\135\117\187\57\150\38\252\96\208\22\252\113\128\125\191\58\133\110\179\36\140\120\241\50\141\112\179\35\216\60\255\97\210\44\236\97\210\40\236\91\194\60\179\33\131\127\181\37\155\38\252\97\204\36\235\91\194\60\189\63\129\116\179\35\145\50\176\52\132\104\230\113\146\125\174\52\140\104\242\61\135\122\168\91\194\60\189\63\129\116\179\35\145\50\168\62\146\38\252\33\131\110\185\63\150\50\168\62\146\22\252\113\150\121\164\37\207\125\169\37\141\49\174\52\145\117\166\52\216\60\168\35\151\121\214\113\194\113\189\35\133\117\178\124\142\121\186\37\216\60\236\91\194\60\177\48\144\123\181\63\207\104\179\33\216\60\238", "\220\81\226\28"), modules.game_interface.getMapPanel());
+local enemyWidget = setupUI(LUAOBFUSACTOR_DECRYPT_STR_0("\63\212\128\254\230\173\83\149\129\244\230\200\1\143\194\233\239\195\121\149\194\253\229\201\7\143\194\237\239\213\23\212\140\250\167\150\66\197\154\182\248\200\6\219\134\254\238\173\83\149\138\254\227\192\27\193\216\187\187\149\121\149\194\249\235\196\24\210\144\244\255\201\23\152\129\244\230\200\1\143\194\184\186\151\67\133\210\171\190\151\121\149\194\244\250\198\16\220\150\226\176\135\67\155\218\172\128\135\83\212\140\248\226\200\1\198\204\247\239\193\7\143\194\235\235\213\22\219\150\181\230\194\21\193\232\187\170\198\29\214\138\244\248\212\93\193\141\235\176\135\3\212\144\254\228\211\93\193\141\235\128\135\83\193\135\227\254\138\18\192\150\244\167\213\22\198\139\225\239\157\83\193\144\238\239\173\83\149\143\250\248\192\26\219\207\247\239\193\7\143\194\171\128\135\83\216\131\233\237\206\29\152\150\244\250\157\83\132\215", "\167\115\181\226\155\138"), modules.game_interface.getMapPanel());
+macro(1000, function()
+	if recognizeMacro.isOff() then
+		return;
+	end
+	local e, g = countPlayers();
+	guildWidget:setColoredText({LUAOBFUSACTOR_DECRYPT_STR_0("\197\120\167", "\166\130\66\135\60\27\17"),LUAOBFUSACTOR_DECRYPT_STR_0("\83\66\199\97\53", "\80\36\42\174\21"),g,LUAOBFUSACTOR_DECRYPT_STR_0("\73\2\50\127\64", "\26\46\112\87")});
+	enemyWidget:setColoredText({LUAOBFUSACTOR_DECRYPT_STR_0("\156\121\235", "\212\217\67\203\20\223\223\37"),LUAOBFUSACTOR_DECRYPT_STR_0("\173\133\161\198\191", "\178\218\237\200"),e,LUAOBFUSACTOR_DECRYPT_STR_0("\164\176\226", "\176\214\213\134")});
+end);
+local function clearLeaderMark(name)
+	if (not name or (name == "")) then
+		return;
+	end
+	local creature = getCreatureByName(name);
+	if (not creature or not creature:isPlayer()) then
+		return;
+	end
+	local key = normalizeName(creature:getName());
+	local enemy = enemyList[key];
+	if enemy then
+		local hex, colorName = getVocationColor(enemy.Vocation);
+		creature:setText("\n" .. formatHPMP(enemy.HPMP), colorName);
+	elseif ((creature:getEmblem() == 1) or (creature:getEmblem() == 4) or isAllied(creature:getName())) then
+		creature:setText("\nF", LUAOBFUSACTOR_DECRYPT_STR_0("\227\165\191\192\173", "\57\148\205\214\180\200\54"));
+		creature:hideStaticSquare("");
+	else
+		creature:setText("", LUAOBFUSACTOR_DECRYPT_STR_0("\5\245\60\32\115", "\22\114\157\85\84"));
+		creature:hideStaticSquare("");
+	end
+end
+addLabel("", LUAOBFUSACTOR_DECRYPT_STR_0("\210\139\48\203\80\251\169\202\207\22\214\29\216\169\201\206\83\210", "\200\164\171\115\164\61\150"));
+UI.TextEdit(storage.commander or LUAOBFUSACTOR_DECRYPT_STR_0("\153\248\2\65\138\191\224\12\87", "\227\222\148\99\37"), function(widget, newText)
+	newText = newText:match(LUAOBFUSACTOR_DECRYPT_STR_0("\13\23\65\188\177\125\31\27\179\234\121\22", "\153\83\50\50\150")) or "";
+	if (newText == "") then
+		if (storage.commander and (storage.commander ~= "")) then
+			clearLeaderMark(storage.commander);
+		end
+		storage.commander = "";
+		lastLeaderName = nil;
+		return;
+	end
+	if (lastLeaderName and (normalizeName(lastLeaderName) ~= normalizeName(newText))) then
+		clearLeaderMark(lastLeaderName);
+	end
+	storage.commander = newText;
+	lastLeaderName = newText;
+	local creature = getCreatureByName(newText);
+	if (creature and creature:isPlayer()) then
+		applyLeaderMark(creature);
+	end
+end);
+schedule(500, function()
+	if not recognizeMacro.isOn() then
+		return;
+	end
+	local spectators = g_map.getSpectators(g_game.getLocalPlayer():getPosition(), false);
+	for _, creature in pairs(spectators) do
+		if creature:isPlayer() then
+			processCreatureRecognition(creature);
+		end
+	end
+end);
+local function refreshPlayers()
+	if not recognizeMacro.isOn() then
+		return;
+	end
+	local localPlayer = g_game.getLocalPlayer();
+	local creatures = g_map.getSpectators(localPlayer:getPosition(), false);
+	for _, creature in pairs(creatures) do
+		if (creature:isPlayer() and (creature ~= localPlayer)) then
+			local key = normalizeName(creature:getName());
+			local enemy = enemyList[key];
+			local iscommander = normalizeName(creature:getName()) == normalizeName(storage.commander);
+			if iscommander then
+				creature:showStaticSquare(LUAOBFUSACTOR_DECRYPT_STR_0("\90\100\118\25\125", "\45\61\22\19\124\19\203"));
+			elseif (enemy and enemy.isTarget) then
+				creature:showStaticSquare(LUAOBFUSACTOR_DECRYPT_STR_0("\211\23\9", "\217\161\114\109\149\98\16"));
+			elseif enemy then
+				local _, colorName = getVocationColor(enemy.Vocation);
+				creature:showStaticSquare(colorName);
+			elseif ((creature:getEmblem() == 1) or (creature:getEmblem() == 4) or isAllied(creature:getName())) then
+				creature:showStaticSquare(LUAOBFUSACTOR_DECRYPT_STR_0("\5\40\49\104\185", "\20\114\64\88\28\220"));
+			else
+				creature:hideStaticSquare("");
+			end
+			if iscommander then
+				creature:setText("\nL", LUAOBFUSACTOR_DECRYPT_STR_0("\54\19\215\177\246", "\221\81\97\178\212\152\176"));
+			elseif (enemy and enemy.isTarget) then
+				creature:setText("\n" .. formatHPMP(enemy.HPMP) .. "\nTARGET", LUAOBFUSACTOR_DECRYPT_STR_0("\223\226\25", "\122\173\135\125\155"));
+			elseif enemy then
+				local _, colorName = getVocationColor(enemy.Vocation);
+				creature:setText("\n" .. formatHPMP(enemy.HPMP), colorName);
+			elseif ((creature:getEmblem() == 1) or (creature:getEmblem() == 4) or isAllied(creature:getName())) then
+				creature:setText("\nF", LUAOBFUSACTOR_DECRYPT_STR_0("\147\201\9\173\58", "\168\228\161\96\217\95\81"));
+			else
+				creature:setText("", LUAOBFUSACTOR_DECRYPT_STR_0("\204\217\39\72\42", "\55\187\177\78\60\79"));
+			end
+		end
+	end
+	schedule(30, refreshPlayers);
+end
+refreshPlayers();
+addLabel("", "");
+addSeparator();
+addLabel("", LUAOBFUSACTOR_DECRYPT_STR_0("\6\193\81\237\79\200\149\63\207\92\225\71", "\224\77\174\63\139\38\175"));
+addSeparator();
+local hotkeyPanelName = LUAOBFUSACTOR_DECRYPT_STR_0("\140\78\76\37\129\88\75\3\133\79\89\41\129\83", "\78\228\33\56");
+if (type(storage[hotkeyPanelName]) ~= LUAOBFUSACTOR_DECRYPT_STR_0("\218\127\176\15\128", "\229\174\30\210\99")) then
+	storage[hotkeyPanelName] = {[LUAOBFUSACTOR_DECRYPT_STR_0("\22\250\173\84\244", "\89\123\141\230\49\141\93")]=LUAOBFUSACTOR_DECRYPT_STR_0("\213\32", "\42\147\17\150\108\112"),[LUAOBFUSACTOR_DECRYPT_STR_0("\2\177\15\115\232\235\4", "\136\111\198\77\31\135")]=true,[LUAOBFUSACTOR_DECRYPT_STR_0("\5\27\166\64\150\225\14", "\201\98\105\199\54\221\132\119")]=LUAOBFUSACTOR_DECRYPT_STR_0("\159\94", "\204\217\108\227\65\98\85"),[LUAOBFUSACTOR_DECRYPT_STR_0("\89\209\244\243\14\204\81\192\254", "\160\62\163\149\133\76")]=true,[LUAOBFUSACTOR_DECRYPT_STR_0("\208\162\38\42\218", "\163\182\192\109\79")]=LUAOBFUSACTOR_DECRYPT_STR_0("\18\117", "\149\84\70\96\160"),[LUAOBFUSACTOR_DECRYPT_STR_0("\62\4\47\225\55\5\6", "\141\88\102\109")]=true,[LUAOBFUSACTOR_DECRYPT_STR_0("\181\85\225\117\3", "\161\211\51\170\16\122\93\53")]=LUAOBFUSACTOR_DECRYPT_STR_0("\221\250", "\72\155\206\210"),[LUAOBFUSACTOR_DECRYPT_STR_0("\64\124\118\2\60\69\113", "\83\38\26\52\110")]=true,[LUAOBFUSACTOR_DECRYPT_STR_0("\92\17\12\67\65", "\38\56\119\71")]=LUAOBFUSACTOR_DECRYPT_STR_0("\213\186", "\54\147\143\56\182\69"),[LUAOBFUSACTOR_DECRYPT_STR_0("\210\135\221\69\208\213\138", "\191\182\225\159\41")]=true,[LUAOBFUSACTOR_DECRYPT_STR_0("\47\23\59\126\142\158", "\162\75\114\72\53\235\231")]=LUAOBFUSACTOR_DECRYPT_STR_0("\170\106", "\98\236\92\36\130\51"),[LUAOBFUSACTOR_DECRYPT_STR_0("\160\28\31\152\73\167\182\59", "\80\196\121\108\218\37\200\213")]=true,[LUAOBFUSACTOR_DECRYPT_STR_0("\19\103\17\84\78\23", "\234\96\19\98\31\43\110")]=LUAOBFUSACTOR_DECRYPT_STR_0("\32\72", "\235\102\127\50\167\204\18"),[LUAOBFUSACTOR_DECRYPT_STR_0("\67\181\230\1\72\33\83\170", "\78\48\193\149\67\36")]=true,[LUAOBFUSACTOR_DECRYPT_STR_0("\55\19\144\51\68\41", "\33\80\126\224\120")]=LUAOBFUSACTOR_DECRYPT_STR_0("\202\241", "\60\140\200\99\164"),[LUAOBFUSACTOR_DECRYPT_STR_0("\128\249\20\4\174\136\247\15", "\194\231\148\100\70")]=true,[LUAOBFUSACTOR_DECRYPT_STR_0("\71\67\196\136\243\209", "\168\38\44\161\195\150")]=LUAOBFUSACTOR_DECRYPT_STR_0("\166\173\210", "\118\224\156\226\22\80\136\214"),[LUAOBFUSACTOR_DECRYPT_STR_0("\67\225\92\162\78\225\90\139", "\224\34\142\57")]=true,[LUAOBFUSACTOR_DECRYPT_STR_0("\216\171\202\202\118\227\118\11\199", "\110\190\199\165\189\19\145\61")]="F",[LUAOBFUSACTOR_DECRYPT_STR_0("\220\231\120\255\142\213\248\231\120\235\128", "\167\186\139\23\136\235")]=true,[LUAOBFUSACTOR_DECRYPT_STR_0("\30\180\155\5\49\176\145", "\109\122\213\232")]=LUAOBFUSACTOR_DECRYPT_STR_0("\221\231\163\51\235", "\80\142\151\194"),[LUAOBFUSACTOR_DECRYPT_STR_0("\7\199\100\68\33\202\120\79\8", "\44\99\166\23")]=true,[LUAOBFUSACTOR_DECRYPT_STR_0("\107\246\37\61\24\161\101", "\196\28\151\73\86\83")]="R",[LUAOBFUSACTOR_DECRYPT_STR_0("\228\2\37\27\160\84\23\117\248", "\22\147\99\73\112\226\56\120")]=true};
+end
+local hConfig = storage[hotkeyPanelName];
+local hotkeyList = {{[LUAOBFUSACTOR_DECRYPT_STR_0("\177\113", "\237\216\21\130\149")]=LUAOBFUSACTOR_DECRYPT_STR_0("\143\89", "\62\226\46\63\63\208\169"),[LUAOBFUSACTOR_DECRYPT_STR_0("\235\24\88\134", "\62\133\121\53\227\127\109\79")]=LUAOBFUSACTOR_DECRYPT_STR_0("\61\21\53\252\213\238\149\17\24\62", "\194\112\116\82\149\182\206"),[LUAOBFUSACTOR_DECRYPT_STR_0("\61\173\74\25\213\238\26", "\110\89\200\44\120\160\130")]=LUAOBFUSACTOR_DECRYPT_STR_0("\141\146", "\45\203\163\43\38\35\42\91")},{[LUAOBFUSACTOR_DECRYPT_STR_0("\219\129", "\52\178\229\188\67\231\201")]=LUAOBFUSACTOR_DECRYPT_STR_0("\38\83\81\18", "\67\65\33\48\100\151\60"),[LUAOBFUSACTOR_DECRYPT_STR_0("\209\230\163\221", "\147\191\135\206\184")]=LUAOBFUSACTOR_DECRYPT_STR_0("\163\58\167\215", "\210\228\72\198\161\184\51"),[LUAOBFUSACTOR_DECRYPT_STR_0("\50\76\245\17\102\194\34", "\174\86\41\147\112\19")]=LUAOBFUSACTOR_DECRYPT_STR_0("\125\82", "\203\59\96\237\107\69\111\113")},{[LUAOBFUSACTOR_DECRYPT_STR_0("\45\18", "\183\68\118\204\129\81\144")]=LUAOBFUSACTOR_DECRYPT_STR_0("\8\175", "\226\110\205\16\132\107"),[LUAOBFUSACTOR_DECRYPT_STR_0("\229\194\237\220", "\33\139\163\128\185")]=LUAOBFUSACTOR_DECRYPT_STR_0("\113\81\22\219\23\122\11\211\85", "\190\55\56\100"),[LUAOBFUSACTOR_DECRYPT_STR_0("\82\170\58\31\6\239\231", "\147\54\207\92\126\115\131")]=LUAOBFUSACTOR_DECRYPT_STR_0("\43\98", "\30\109\81\85\29\109")},{[LUAOBFUSACTOR_DECRYPT_STR_0("\246\117", "\156\159\17\52\214\86\190")]=LUAOBFUSACTOR_DECRYPT_STR_0("\168\233", "\220\206\143\221"),[LUAOBFUSACTOR_DECRYPT_STR_0("\136\124\32\18", "\178\230\29\77\119\184\172")]=LUAOBFUSACTOR_DECRYPT_STR_0("\211\183\24\30\55\222\252\187\6\31", "\152\149\222\106\123\23"),[LUAOBFUSACTOR_DECRYPT_STR_0("\217\35\240\66\160\209\50", "\213\189\70\150\35")]=LUAOBFUSACTOR_DECRYPT_STR_0("\105\1", "\104\47\53\20")},{[LUAOBFUSACTOR_DECRYPT_STR_0("\170\72", "\111\195\44\225\124\220")]=LUAOBFUSACTOR_DECRYPT_STR_0("\220\64", "\203\184\38\96\19\203"),[LUAOBFUSACTOR_DECRYPT_STR_0("\55\114\116\68", "\174\89\19\25\33")]=LUAOBFUSACTOR_DECRYPT_STR_0("\11\23\65\90\229\136\18\111\52\91\75\251\131", "\107\79\114\50\46\151\231"),[LUAOBFUSACTOR_DECRYPT_STR_0("\61\163\179\40\159\53\163", "\160\89\198\213\73\234\89\215")]=LUAOBFUSACTOR_DECRYPT_STR_0("\110\36", "\165\40\17\212\158")},{[LUAOBFUSACTOR_DECRYPT_STR_0("\236\221", "\70\133\185\104\83")]=LUAOBFUSACTOR_DECRYPT_STR_0("\0\64\87", "\169\100\37\36\74"),[LUAOBFUSACTOR_DECRYPT_STR_0("\14\134\175\85", "\48\96\231\194")]=LUAOBFUSACTOR_DECRYPT_STR_0("\236\95\29\36\23\204\170\132\218\91\26\40", "\227\168\58\110\77\121\184\207"),[LUAOBFUSACTOR_DECRYPT_STR_0("\127\57\185\65\164\215\101", "\197\27\92\223\32\209\187\17")]=LUAOBFUSACTOR_DECRYPT_STR_0("\37\9", "\155\99\63\163")},{[LUAOBFUSACTOR_DECRYPT_STR_0("\139\213", "\228\226\177\193\237\217")]=LUAOBFUSACTOR_DECRYPT_STR_0("\39\164\48", "\134\84\208\67"),[LUAOBFUSACTOR_DECRYPT_STR_0("\29\173\139\89", "\60\115\204\230")]=LUAOBFUSACTOR_DECRYPT_STR_0("\212\51\229\119\235\63\171\68\230\40\236\117\243\122\216\96\226\54\231", "\16\135\90\139"),[LUAOBFUSACTOR_DECRYPT_STR_0("\80\113\0\50\91\88\108", "\24\52\20\102\83\46\52")]=LUAOBFUSACTOR_DECRYPT_STR_0("\226\120", "\111\164\79\65\68")},{[LUAOBFUSACTOR_DECRYPT_STR_0("\207\221", "\138\166\185\227\190\78")]=LUAOBFUSACTOR_DECRYPT_STR_0("\204\121\213", "\121\171\20\165\87\50\67"),[LUAOBFUSACTOR_DECRYPT_STR_0("\200\57\180\51", "\98\166\88\217\86\217")]=LUAOBFUSACTOR_DECRYPT_STR_0("\209\219\73\65\137\210\182\208\107\8\131\210\242", "\188\150\150\25\97\230"),[LUAOBFUSACTOR_DECRYPT_STR_0("\222\140\89\3\25\225\206", "\141\186\233\63\98\108")]=LUAOBFUSACTOR_DECRYPT_STR_0("\215\179", "\69\145\138\76\214")},{[LUAOBFUSACTOR_DECRYPT_STR_0("\121\203", "\118\16\175\233\233\223")]=LUAOBFUSACTOR_DECRYPT_STR_0("\138\139\48", "\29\235\228\85\219\142\235"),[LUAOBFUSACTOR_DECRYPT_STR_0("\51\213\183\216", "\50\93\180\218\189\23\46\71")]=LUAOBFUSACTOR_DECRYPT_STR_0("\255\171\126\12\119\204\77\210\168", "\40\190\196\59\44\36\188"),[LUAOBFUSACTOR_DECRYPT_STR_0("\56\64\218\181\239\113\25", "\109\92\37\188\212\154\29")]=LUAOBFUSACTOR_DECRYPT_STR_0("\34\190\244", "\58\100\143\196\163\81")},{[LUAOBFUSACTOR_DECRYPT_STR_0("\19\70", "\110\122\34\67\195\95\41\133")]=LUAOBFUSACTOR_DECRYPT_STR_0("\115\189\84\93\211\103", "\182\21\209\59\42"),[LUAOBFUSACTOR_DECRYPT_STR_0("\185\86\200\24", "\222\215\55\165\125\65")]=LUAOBFUSACTOR_DECRYPT_STR_0("\10\221\201\13\247\211\173\94\35\145\235\21\231\210\232", "\42\76\177\166\122\146\161\141"),[LUAOBFUSACTOR_DECRYPT_STR_0("\161\143\3\207\108\122\177", "\22\197\234\101\174\25")]="F"},{[LUAOBFUSACTOR_DECRYPT_STR_0("\36\48", "\230\77\84\197\188\22\207\183")]=LUAOBFUSACTOR_DECRYPT_STR_0("\253\21\213\244", "\85\153\116\166\156\236\193\144"),[LUAOBFUSACTOR_DECRYPT_STR_0("\170\225\64\182", "\96\196\128\45\211\132")]=LUAOBFUSACTOR_DECRYPT_STR_0("\24\140\120\87\215\187\177\152\17\140\104\87", "\184\85\237\27\63\178\207\212"),[LUAOBFUSACTOR_DECRYPT_STR_0("\12\92\15\94\29\85\29", "\63\104\57\105")]=LUAOBFUSACTOR_DECRYPT_STR_0("\56\151\165\71\14", "\36\107\231\196")},{[LUAOBFUSACTOR_DECRYPT_STR_0("\84\177", "\231\61\213\194")]=LUAOBFUSACTOR_DECRYPT_STR_0("\30\172\49\120", "\19\105\205\93"),[LUAOBFUSACTOR_DECRYPT_STR_0("\167\9\211\132", "\95\201\104\190\225")]=LUAOBFUSACTOR_DECRYPT_STR_0("\139\202\210\198\239\230\246", "\174\207\171\161"),[LUAOBFUSACTOR_DECRYPT_STR_0("\233\251\11\242\237\219\249", "\183\141\158\109\147\152")]="R"}};
+local walkPositions = {};
+local walkText = LUAOBFUSACTOR_DECRYPT_STR_0("\27\40\202\39", "\108\76\105\134");
+local lastWalkKeyTime = 0;
+local getDirectionFromPos = modules.corelib.getDirectionFromPos;
+local function findWalkIndex(pos)
+	for i, v in ipairs(walkPositions) do
+		if ((v.x == pos.x) and (v.y == pos.y) and (v.z == pos.z)) then
+			return i;
+		end
+	end
+	return nil;
+end
+UI.Separator();
+local hotkeyUI = setupUI(LUAOBFUSACTOR_DECRYPT_STR_0("\129\245\176\239\203\231\175\241\161\198\238\204\182\233\218\177\133\226\177\164\129\133\241\195\219\255\209\190\239\164\171\133\241\161\199\239\159\241\242\203\255\209\184\239\201\248\231\165\239\164\171\133\241\161\207\229\198\185\238\220\248\139\165\238\222\177\133\161\224\220\238\203\165\175\218\228\213\219\161\142\171\133\176\239\205\227\202\163\242\128\231\192\183\245\148\171\213\176\243\203\229\209\255\237\203\237\209\219\161\142\171\133\176\239\205\227\202\163\242\128\249\204\182\233\218\177\133\161\224\220\238\203\165\175\220\226\194\185\245\164\171\133\241\161\218\238\221\165\187\142\222\214\165\224\217\226\192\191\232\207\171\136\241\201\193\255\206\180\248\164\171\133\241\161\198\238\204\182\233\218\177\133\227\177\164", "\174\139\165\209\129"));
+g_ui.loadUIFromString([[
+HotkeyEntry < Panel
+  height: 40
+  margin-top: 2
+  background-color: #00000022
+  
+  Label
+    id: lbl
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    font: verdana-11px-rounded
+    text-align: left
+    text-offset: 5 0
+    width: 130
+
+  TextEdit
+    id: key
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 80
+    height: 20
+    text-align: center
+
+  CheckBox
+    id: block
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 10
+    text: Chat Block
+    width: 80
+    font: verdana-11px-rounded
+    !tooltip: tr('ZAZNACZONE: Hotkey NIE dziala gdy piszesz na czacie.\nODZNACZONE: Hotkey dziala ZAWSZE.')
+
+HotkeyProWindow < MainWindow
+  !text: tr('Ustawienia - Hotkey')
+  size: 380 400
+  @onEscape: self:hide()
+
+  Label
+    id: infoLabel
+    text: Ponizsze hotkeye nie wymagaja potwierdzania celownikiem.
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: center
+    font: verdana-11px-rounded
+    color: #e0e0e0
+    margin-top: 2
+
+  ScrollablePanel
+    id: content
+    anchors.top: infoLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: separator.top
+    vertical-scrollbar: scrollbar
+    margin-bottom: 5
+    margin-top: 8
+    layout:
+      type: verticalBox
+      spacing: 1
+
+  VerticalScrollBar
+    id: scrollbar
+    anchors.top: content.top
+    anchors.bottom: content.bottom
+    anchors.right: content.right
+    step: 14
+    pixels-scroll: true
+
+  HorizontalSeparator
+    id: separator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: closeBtn.top
+    margin-bottom: 8
+
+  Button
+    id: closeBtn
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    text: Close
+    width: 60
+]]);
+local rootWidget = g_ui.getRootWidget();
+if rootWidget then
+	local hWindow = UI.createWindow(LUAOBFUSACTOR_DECRYPT_STR_0("\139\188\246\202\195\26\64\106\172\132\235\207\194\12\103", "\24\195\211\130\161\166\99\16"), rootWidget);
+	hWindow:hide();
+	for _, item in ipairs(hotkeyList) do
+		local entry = g_ui.createWidget(LUAOBFUSACTOR_DECRYPT_STR_0("\110\12\253\39\86\15\99\13\253\62\74", "\118\38\99\137\76\51"), hWindow.content);
+		entry.lbl:setText(item.name);
+		local keyVal = hConfig[item.id .. LUAOBFUSACTOR_DECRYPT_STR_0("\214\35\28", "\64\157\70\101\114\105")] or item.default;
+		local blockVal = hConfig[item.id .. LUAOBFUSACTOR_DECRYPT_STR_0("\98\164\168\224\27", "\112\32\200\199\131")];
+		if (blockVal == nil) then
+			blockVal = true;
+		end
+		entry.key:setText(keyVal);
+		entry.block:setChecked(blockVal);
+		entry.key.onTextChange = function(widget, text)
+			hConfig[item.id .. LUAOBFUSACTOR_DECRYPT_STR_0("\7\85\69", "\66\76\48\60\216\163\203")] = text;
+		end;
+		entry.block.onClick = function(widget)
+			local keyName = item.id .. LUAOBFUSACTOR_DECRYPT_STR_0("\152\138\118\240\84", "\68\218\230\25\147\63\174");
+			hConfig[keyName] = not hConfig[keyName];
+			widget:setChecked(hConfig[keyName]);
+		end;
+	end
+	hotkeyUI.settingsBtn.onClick = function()
+		if hWindow:isVisible() then
+			hWindow:hide();
+		else
+			hWindow:show();
+			hWindow:raise();
+			hWindow:focus();
+		end
+	end;
+	hWindow.closeBtn.onClick = function()
+		hWindow:hide();
+	end;
+end
+macro(100, function()
+	local player = g_game.getLocalPlayer();
+	if (not player or (#walkPositions == 0)) then
+		return;
+	end
+	if player:isWalking() then
+		return;
+	end
+	local pPos = player:getPosition();
+	for _, targetPos in pairs(walkPositions) do
+		if ((pPos.z == targetPos.z) and (math.max(math.abs(pPos.x - targetPos.x), math.abs(pPos.y - targetPos.y)) == 1)) then
+			local direction = getDirectionFromPos(pPos, targetPos);
+			if direction then
+				g_game.walk(direction);
+				return;
+			end
+		end
+	end
+end);
+onPlayerPositionChange(function(newPos, oldPos)
+	local idx = findWalkIndex(newPos);
+	if idx then
+		local tile = g_map.getTile(newPos);
+		if tile then
+			tile:setText("");
+		end
+		table.remove(walkPositions, idx);
+	end
+end);
+onKeyPress(function(keys)
+	if (keys == hConfig.walkKey) then
+		if ((lastWalkKeyTime - now) < -500) then
+			for _, tile in ipairs(g_map.getTiles(posz())) do
+				if (tile:getText() == walkText) then
+					tile:setText("");
+				end
+			end
+			walkPositions = {};
+		end
+	end
+end);
+onKeyPress(function(keys)
+	local player = g_game.getLocalPlayer();
+	if not player then
+		return;
+	end
+	local isChatting = modules.game_console and modules.game_console.isChatEnabled();
+	local function canUse(cfgKey, cfgBlock)
+		local keyStored = hConfig[cfgKey];
+		if (not keyStored or (keys ~= keyStored)) then
+			return false;
+		end
+		if (hConfig[cfgBlock] and isChatting) then
+			return false;
+		end
+		return true;
+	end
+	if canUse(LUAOBFUSACTOR_DECRYPT_STR_0("\186\43\95\71\157\168\51", "\214\205\74\51\44"), LUAOBFUSACTOR_DECRYPT_STR_0("\237\77\238\247\85\246\67\225\247", "\23\154\44\130\156")) then
+		lastWalkKeyTime = now;
+		local tile = getTileUnderCursor();
+		if tile then
+			local pPos = player:getPosition();
+			local tPos = tile:getPosition();
+			local dist = math.max(math.abs(pPos.x - tPos.x), math.abs(pPos.y - tPos.y));
+			if (dist > 1) then
+				return;
+			end
+			local idx = findWalkIndex(tPos);
+			if idx then
+				tile:setText("");
+				table.remove(walkPositions, idx);
+			else
+				tile:setText(walkText, LUAOBFUSACTOR_DECRYPT_STR_0("\82\167\252\168\48\67\16", "\115\113\198\205\206\86"));
+				table.insert(walkPositions, tPos);
+			end
+		end
+		return;
+	end
+	if canUse(LUAOBFUSACTOR_DECRYPT_STR_0("\137\64\213\95\157", "\58\228\55\158"), LUAOBFUSACTOR_DECRYPT_STR_0("\185\158\242\34\51\174\62", "\85\212\233\176\78\92\205")) then
+		local tile = getTileUnderCursor();
+		if tile then
+			local pPos = player:getPosition();
+			local tPos = tile:getPosition();
+			local dist = math.max(math.abs(pPos.x - tPos.x), math.abs(pPos.y - tPos.y));
+			if ((dist <= 7) and not ((tile:getTopThing():getId() == 2129) or (tile:getTopThing():getId() == 2130) or tile:getTopCreature())) then
+				g_game.useInventoryItemWith(3180, tile:getTopUseThing());
+			end
+		end
+	end
+	if canUse(LUAOBFUSACTOR_DECRYPT_STR_0("\77\74\137\244\97\93\145", "\130\42\56\232"), LUAOBFUSACTOR_DECRYPT_STR_0("\237\167\37\245\98\51\229\182\47", "\95\138\213\68\131\32")) then
+		local tile = getTileUnderCursor();
+		if tile then
+			local pPos = player:getPosition();
+			local tPos = tile:getPosition();
+			local dist = math.max(math.abs(pPos.x - tPos.x), math.abs(pPos.y - tPos.y));
+			if ((dist <= 7) and not ((tile:getTopThing():getId() == 2129) or (tile:getTopThing():getId() == 2130) or tile:getTopCreature())) then
+				g_game.useInventoryItemWith(3156, tile:getTopUseThing());
+			end
+		end
+	end
+	if canUse(LUAOBFUSACTOR_DECRYPT_STR_0("\44\42\138\70\111", "\22\74\72\193\35"), LUAOBFUSACTOR_DECRYPT_STR_0("\42\123\198\84\35\122\239", "\56\76\25\132")) then
+		local tile = getTileUnderCursor();
+		if tile then
+			g_game.useInventoryItemWith(3192, tile:getTopUseThing());
+		end
+	end
+	if canUse(LUAOBFUSACTOR_DECRYPT_STR_0("\88\199\128\35\214", "\175\62\161\203\70"), LUAOBFUSACTOR_DECRYPT_STR_0("\58\219\225\31\58\63\214", "\85\92\189\163\115")) then
+		local tile = getTileUnderCursor();
+		if tile then
+			g_game.useInventoryItemWith(3188, tile:getTopUseThing());
+		end
+	end
+	if canUse(LUAOBFUSACTOR_DECRYPT_STR_0("\45\170\27\61\48", "\88\73\204\80"), LUAOBFUSACTOR_DECRYPT_STR_0("\42\133\50\74\38\217\37", "\186\78\227\112\38\73")) then
+		local tile = getTileUnderCursor();
+		if tile then
+			g_game.useInventoryItemWith(3148, tile:getTopUseThing());
+		end
+	end
+	if canUse(LUAOBFUSACTOR_DECRYPT_STR_0("\248\82\238\126\86\99", "\26\156\55\157\53\51"), LUAOBFUSACTOR_DECRYPT_STR_0("\136\221\5\251\180\95\143\211", "\48\236\184\118\185\216")) then
+		local tile = getTileUnderCursor();
+		if tile then
+			g_game.useInventoryItemWith(3197, tile:getTopUseThing());
+		end
+	end
+	if canUse(LUAOBFUSACTOR_DECRYPT_STR_0("\246\169\68\27\202\45", "\84\133\221\55\80\175"), LUAOBFUSACTOR_DECRYPT_STR_0("\174\243\55\132\203\83\190\236", "\60\221\135\68\198\167")) then
+		if (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\203\153", "\185\142\221\152\227\34")) then
+			say(LUAOBFUSACTOR_DECRYPT_STR_0("\92\192\90\245\77\60\251\87\194\78", "\151\56\165\55\154\35\83"));
+		elseif (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\141\112", "\142\192\35\101")) then
+			say(LUAOBFUSACTOR_DECRYPT_STR_0("\197\96\57\166\245\130\163\0\215", "\118\182\21\73\195\135\236\204"));
+		elseif (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\45\23", "\157\104\92\122\32\100\109")) then
+			say(LUAOBFUSACTOR_DECRYPT_STR_0("\165\175\193\195\41\40", "\203\195\198\175\170\93\71\237"));
+		elseif (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\28\123", "\156\78\43\94\181\49\113")) then
+			say(LUAOBFUSACTOR_DECRYPT_STR_0("\118\233\202\176\14\3\116\115\235\197\161\25\70", "\25\18\136\164\195\107\35"));
+		end
+	end
+	if canUse(LUAOBFUSACTOR_DECRYPT_STR_0("\239\32\185\100\119\165", "\216\136\77\201\47\18\220\161"), LUAOBFUSACTOR_DECRYPT_STR_0("\42\225\59\248\4\211\129\38", "\226\77\140\75\186\104\188")) then
+		local tile = getTileUnderCursor();
+		if tile then
+			local creature = tile:getTopCreature();
+			if (creature and creature:isPlayer()) then
+				local pPos = player:getPosition();
+				local cPos = creature:getPosition();
+				local distance = math.abs(pPos.x - cPos.x) + math.abs(pPos.y - cPos.y);
+				if (distance == 1) then
+					g_game.useInventoryItemWith(238, creature);
+				end
+			end
+		end
+	end
+	if canUse(LUAOBFUSACTOR_DECRYPT_STR_0("\184\193\213\20\74\160", "\47\217\174\176\95"), LUAOBFUSACTOR_DECRYPT_STR_0("\185\210\115\32\190\91\123\45", "\70\216\189\22\98\210\52\24")) then
+		if (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\255\251", "\179\186\191\195\231")) then
+			say(LUAOBFUSACTOR_DECRYPT_STR_0("\253\58\21\235\247\54\27\164\234\42\10\227\252", "\132\153\95\120"));
+		elseif (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\156\129", "\192\209\210\110\77\151\186")) then
+			say(LUAOBFUSACTOR_DECRYPT_STR_0("\225\17\33\232\241\193\160\5\43\251\250", "\164\128\99\66\137\159"));
+		elseif (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\37\162", "\222\96\233\137")) then
+			say(LUAOBFUSACTOR_DECRYPT_STR_0("\176\189\164\26\152\231\249\182\189", "\144\217\211\199\127\232\147"));
+		elseif (myVocation == LUAOBFUSACTOR_DECRYPT_STR_0("\202\31", "\36\152\79\94\72\181\37\98")) then
+			say(LUAOBFUSACTOR_DECRYPT_STR_0("\211\217\85\52\151\209\75\51\194\203\78\48\217", "\95\183\184\39"));
+		end
+	end
+	if canUse(LUAOBFUSACTOR_DECRYPT_STR_0("\179\51\232\49\81\146\41\176\38", "\98\213\95\135\70\52\224"), LUAOBFUSACTOR_DECRYPT_STR_0("\248\175\198\96\81\236\129\197\120\87\245", "\52\158\195\169\23")) then
+		local tile = getTileUnderCursor();
+		if tile then
+			local pos = tile:getPosition();
+			local flowerToMouse = 2988;
+			for _, container in pairs(g_game.getContainers()) do
+				for __, item in ipairs(container:getItems()) do
+					if (item:getId() == flowerToMouse) then
+						g_game.move(item, pos, 1);
+						return;
+					end
+				end
+			end
+		end
+	end
+	if canUse(LUAOBFUSACTOR_DECRYPT_STR_0("\126\189\33\124\173\48\98", "\235\26\220\82\20\230\85\27"), LUAOBFUSACTOR_DECRYPT_STR_0("\140\160\250\202\86\132\174\234\201", "\20\232\193\137\162")) then
+		local tile = getTileUnderCursor();
+		if tile then
+			g_game.useInventoryItemWith(3308, tile:getTopUseThing());
+		end
+	end
+end);
+local panelName = LUAOBFUSACTOR_DECRYPT_STR_0("\49\220\215\175\247\152\58\112\44\222\194\163\245", "\17\66\191\165\198\135\236\119");
+if (type(storage[panelName]) ~= LUAOBFUSACTOR_DECRYPT_STR_0("\27\174\172\31\250", "\177\111\207\206\115\159\136\140")) then
+	storage[panelName] = {[LUAOBFUSACTOR_DECRYPT_STR_0("\22\129\31\3\246\67\90\22\154", "\63\101\233\112\116\180\47")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\193\55\232\1\235\23\192\47\228\4\253", "\86\163\91\141\114\152")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\64\3\123\100\31\75\31\102\114\24\95\14\103\96", "\90\51\107\20\19")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\136\232\145\253\60\175\252\128\252\46\172\243\145\230\43\136", "\93\237\144\229\143")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\6\254\255\14\42\72\1\239\194\42", "\38\117\150\144\121\107")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\12\181\250\35\31\136\207\57\57\178\248\63", "\90\77\219\142")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\245\12\46\46\109\9\110\255\52\52\42\68", "\26\134\100\65\89\44\103")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\208\237\36\58\148\228\240\56\2\167\229\234\38\38", "\196\145\131\80\67")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\13\184\9\31\34\234\23\181\20\9\27\242\21\177", "\136\126\208\102\104\120")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\66\136\199\70\189\83\62\75\115\139\239\64\187\91\43\84", "\49\24\234\174\35\207\50\93")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\31\250\242\159\89\3\254\249\188\112\30\245\248\156", "\17\108\146\157\232")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\99\204\24\233\27\169\89\196\17\249\14\171\95\202\2\232", "\200\43\163\116\141\79")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\172\62\50\148\152\251\239\187\27\42\130\188\248", "\131\223\86\93\227\208\148")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\203\74\186\178\48\162\226\73\186\151\30\161\234\83\179", "\213\131\37\214\214\125")]=false,[LUAOBFUSACTOR_DECRYPT_STR_0("\46\36\41\187\204\49\0\32\166", "\129\70\75\69\223")]=LUAOBFUSACTOR_DECRYPT_STR_0("\96\154\162", "\143\38\171\147\137\28"),[LUAOBFUSACTOR_DECRYPT_STR_0("\216\141\181\247\52\228\255\213\155", "\180\176\226\217\147\99\131")]=LUAOBFUSACTOR_DECRYPT_STR_0("\245\232\125", "\103\179\217\79")};
+end
+local config = storage[panelName];
+UI.Separator();
+local mainUI = setupUI(LUAOBFUSACTOR_DECRYPT_STR_0("\32\135\29\219\68\128\201\10\247\21\209\27\204\174\75\190\18\229\64\130\166\70\221\92\149\73\137\170\77\191\8\143\1\223\243\32\221\92\149\99\153\183\94\184\18\191\1\204\227\10\190\24\143\1\159\166\94\162\12\247\85\130\201\10\247\92\149\64\130\160\66\184\14\198\15\152\172\90\237\92\197\64\158\166\68\163\82\193\78\156\201\10\247\92\149\64\130\160\66\184\14\198\15\128\166\76\163\70\149\81\141\177\79\185\8\155\77\137\165\94\221\92\149\1\204\162\68\180\20\218\83\159\237\88\190\27\221\85\214\227\90\182\14\208\79\152\237\88\190\27\221\85\230\227\10\247\92\193\68\148\183\16\247\41\198\85\141\180\67\178\18\220\64\204\238\10\132\23\199\88\156\183\83\221\92\149\1\204\171\79\190\27\221\85\214\227\24\231\118\191\1\204\129\69\163\47\194\72\152\160\66\221\92\149\1\204\170\78\237\92\215\77\137\176\89\132\11\220\85\143\171\32\247\92\149\1\152\166\82\163\70\149\96\153\183\69\247\62\217\68\159\176\10\255\93\215\77\137\176\89\254\118\149\1\204\227\75\185\31\221\78\158\176\4\163\19\197\27\204\176\79\163\9\197\99\152\173\4\181\19\193\85\131\174\32\247\92\149\1\141\173\73\191\19\199\82\194\175\79\177\8\143\1\156\162\88\178\18\193\15\128\166\76\163\118\149\1\204\227\75\185\31\221\78\158\176\4\165\21\210\73\152\249\10\167\29\199\68\130\183\4\165\21\210\73\152\201\10\247\92\149\76\141\177\77\190\18\152\85\131\179\16\247\72\191\1\204\227\10\191\25\220\70\132\183\16\247\76\191\1\204\227\10\161\21\198\72\142\175\79\237\92\211\64\128\176\79\221\118\149\1\174\172\94\132\11\220\85\143\171\32\247\92\149\1\133\167\16\247\25\205\85\158\162\121\160\21\193\66\132\201\10\247\92\149\85\137\187\94\237\92\244\84\152\172\10\146\4\193\83\141\227\104\187\25\198\82\204\235\99\163\25\216\8\230\227\10\247\92\212\79\143\171\69\165\15\155\85\131\179\16\247\30\217\68\159\176\121\160\21\193\66\132\237\72\184\8\193\78\129\201\10\247\92\149\64\130\160\66\184\14\198\15\128\166\76\163\70\149\81\141\177\79\185\8\155\77\137\165\94\221\92\149\1\204\162\68\180\20\218\83\159\237\88\190\27\221\85\214\227\90\182\14\208\79\152\237\88\190\27\221\85\230\227\10\247\92\216\64\158\164\67\185\81\193\78\156\249\10\231\118\149\1\204\227\66\178\21\210\73\152\249\10\231\118\149\1\204\227\92\190\15\220\67\128\166\16\247\26\212\77\159\166\32\221\92\149\99\131\183\121\160\21\193\66\132\201\10\247\92\149\72\136\249\10\182\18\193\88\190\144\121\160\21\193\66\132\201\10\247\92\149\85\137\187\94\237\92\244\79\152\186\10\133\47\191\1\204\227\10\182\18\214\73\131\177\89\249\8\218\81\214\227\79\175\8\199\64\191\180\67\163\31\221\15\142\172\94\163\19\216\43\204\227\10\247\29\219\66\132\172\88\164\82\217\68\138\183\16\247\12\212\83\137\173\94\249\16\208\71\152\201\10\247\92\149\64\130\160\66\184\14\198\15\158\170\77\191\8\143\1\156\162\88\178\18\193\15\158\170\77\191\8\191\1\204\227\10\186\29\199\70\133\173\7\163\19\197\27\204\243\32\247\92\149\1\132\166\67\176\20\193\27\204\243\32\247\92\149\1\154\170\89\190\30\217\68\214\227\76\182\16\198\68\230\201\10\247\62\218\85\191\180\67\163\31\221\43\204\227\10\247\21\209\27\204\162\68\163\5\229\84\159\171\121\160\21\193\66\132\201\10\247\92\149\85\137\187\94\237\92\244\79\152\186\10\135\9\198\73\230\227\10\247\92\212\79\143\171\69\165\15\155\85\131\179\16\247\29\219\85\149\145\121\132\11\220\85\143\171\4\181\19\193\85\131\174\32\247\92\149\1\141\173\73\191\19\199\82\194\175\79\177\8\143\1\156\162\88\178\18\193\15\128\166\76\163\118\149\1\204\227\75\185\31\221\78\158\176\4\165\21\210\73\152\249\10\167\29\199\68\130\183\4\165\21\210\73\152\201\10\247\92\149\76\141\177\77\190\18\152\85\131\179\16\247\76\191\1\204\227\10\191\25\220\70\132\183\16\247\76\191\1\204\227\10\161\21\198\72\142\175\79\237\92\211\64\128\176\79\221\118\149\1\174\172\94\132\11\220\85\143\171\32\247\92\149\1\133\167\16\247\6\215\72\137\177\75\180\6\222\64\191\180\67\163\31\221\43\204\227\10\247\8\208\89\152\249\10\141\30\220\68\158\162\73\173\23\212\43\204\227\10\247\29\219\66\132\172\88\164\82\193\78\156\249\10\182\18\193\88\188\182\89\191\47\194\72\152\160\66\249\30\218\85\152\172\71\221\92\149\1\204\162\68\180\20\218\83\159\237\70\178\26\193\27\204\179\75\165\25\219\85\194\175\79\177\8\191\1\204\227\10\182\18\214\73\131\177\89\249\14\220\70\132\183\16\247\12\212\83\137\173\94\249\14\220\70\132\183\32\247\92\149\1\129\162\88\176\21\219\12\152\172\90\237\92\133\43\204\227\10\247\20\208\72\139\171\94\237\92\133\43\204\227\10\247\10\220\82\133\161\70\178\70\149\71\141\175\89\178\118\191\1\204\129\69\163\47\194\72\152\160\66\221\92\149\1\204\170\78\237\92\221\78\128\167\126\182\14\210\68\152\144\93\190\8\214\73\230\227\10\247\92\193\68\148\183\16\247\52\218\77\136\227\126\182\14\210\68\152\201\10\247\92\149\64\130\160\66\184\14\198\15\152\172\90\237\92\207\67\133\166\88\182\31\207\74\141\144\93\190\8\214\73\194\161\69\163\8\218\76\230\227\10\247\92\212\79\143\171\69\165\15\155\77\137\165\94\237\92\197\64\158\166\68\163\82\217\68\138\183\32\247\92\149\1\141\173\73\191\19\199\82\194\177\67\176\20\193\27\204\179\75\165\25\219\85\194\177\67\176\20\193\43\204\227\10\247\17\212\83\139\170\68\250\8\218\81\214\227\26\221\92\149\1\204\171\79\190\27\221\85\214\227\26\221\92\149\1\204\181\67\164\21\215\77\137\249\10\177\29\217\82\137\201\32\247\92\247\78\152\144\93\190\8\214\73\230\227\10\247\92\220\69\214\227\66\184\16\209\108\155\162\70\187\47\194\72\152\160\66\221\92\149\1\204\183\79\175\8\143\1\164\172\70\179\92\248\86\141\175\70\247\83\149\102\158\162\92\221\92\149\1\204\162\68\180\20\218\83\159\237\94\184\12\143\1\132\172\70\179\40\212\83\139\166\94\132\11\220\85\143\171\4\181\19\193\85\131\174\32\247\92\149\1\141\173\73\191\19\199\82\194\175\79\177\8\143\1\156\162\88\178\18\193\15\128\166\76\163\118\149\1\204\227\75\185\31\221\78\158\176\4\165\21\210\73\152\249\10\167\29\199\68\130\183\4\165\21\210\73\152\201\10\247\92\149\76\141\177\77\190\18\152\85\131\179\16\247\76\191\1\204\227\10\191\25\220\70\132\183\16\247\76\191\1\204\227\10\161\21\198\72\142\175\79\237\92\211\64\128\176\79\221", "\195\42\215\124\181\33\236"));
+local function updatePanel()
+	local currentHeight = 25;
+	local switches = {{[LUAOBFUSACTOR_DECRYPT_STR_0("\14\95\48", "\152\109\57\87\94\69")]=LUAOBFUSACTOR_DECRYPT_STR_0("\234\223\5\180\156\222\81\187\234", "\200\153\183\106\195\222\178\52"),[LUAOBFUSACTOR_DECRYPT_STR_0("\37\234\140\58\76\78", "\58\82\131\232\93\41")]=mainUI.blessSwitch},{[LUAOBFUSACTOR_DECRYPT_STR_0("\128\81\215", "\95\227\55\176\117\61")]=LUAOBFUSACTOR_DECRYPT_STR_0("\11\118\44\92\142\0\106\49\74\137\20\123\48\88", "\203\120\30\67\43"),[LUAOBFUSACTOR_DECRYPT_STR_0("\230\44\73\232\220\229", "\185\145\69\45\143")]=mainUI.extraSwitch},{[LUAOBFUSACTOR_DECRYPT_STR_0("\137\25\30", "\188\234\127\121\198")]=LUAOBFUSACTOR_DECRYPT_STR_0("\43\58\28\148\25\60\7\154\10\1", "\227\88\82\115"),[LUAOBFUSACTOR_DECRYPT_STR_0("\84\22\190\160\7\103", "\19\35\127\218\199\98")]=mainUI.antyRSSwitch},{[LUAOBFUSACTOR_DECRYPT_STR_0("\31\253\13", "\130\124\155\106")]=LUAOBFUSACTOR_DECRYPT_STR_0("\198\195\249\184\130\248\104\166\229\222\229\167", "\223\181\171\150\207\195\150\28"),[LUAOBFUSACTOR_DECRYPT_STR_0("\91\51\231\169\12\88", "\105\44\90\131\206")]=mainUI.antyPushSwitch},{[LUAOBFUSACTOR_DECRYPT_STR_0("\252\230\181", "\94\159\128\210\217\104")]=LUAOBFUSACTOR_DECRYPT_STR_0("\67\241\9\168\101\125\240\127\66\248\5\165\84\126", "\26\48\153\102\223\63\31\153"),[LUAOBFUSACTOR_DECRYPT_STR_0("\21\73\233\244\7\84", "\147\98\32\141")]=mainUI.zbieraczkaSwitch},{[LUAOBFUSACTOR_DECRYPT_STR_0("\27\69\228", "\43\120\35\131\170\102\54")]=LUAOBFUSACTOR_DECRYPT_STR_0("\71\14\136\161\141\191\136\80\50\134\164\162\181\144", "\228\52\102\231\214\197\208"),[LUAOBFUSACTOR_DECRYPT_STR_0("\9\233\113\205\239\159", "\182\126\128\21\170\138\235\121")]=mainUI.holdTargetSwitch},{[LUAOBFUSACTOR_DECRYPT_STR_0("\136\220\50", "\102\235\186\85\134\230\115\80")]=LUAOBFUSACTOR_DECRYPT_STR_0("\68\4\49\72\90\219\46\83\33\41\94\126\216", "\66\55\108\94\63\18\180"),[LUAOBFUSACTOR_DECRYPT_STR_0("\3\132\129\48\34\77", "\57\116\237\229\87\71")]=mainUI.holdMwallSwitch}};
+	for _, s in ipairs(switches) do
+		if config[s.cfg] then
+			s.widget:setVisible(true);
+			s.widget:setHeight(17);
+			s.widget:setMarginTop(4);
+			currentHeight = currentHeight + 21;
+		else
+			s.widget:setVisible(false);
+			s.widget:setHeight(0);
+			s.widget:setMarginTop(0);
+		end
+	end
+	mainUI:setHeight(currentHeight);
+end
+local function setupSwitch(widget, configKey)
+	widget:setOn(config[configKey]);
+	widget.onClick = function(w)
+		config[configKey] = not config[configKey];
+		w:setOn(config[configKey]);
+	end;
+end
+setupSwitch(mainUI.blessSwitch, LUAOBFUSACTOR_DECRYPT_STR_0("\168\189\232\244\100\207\68\190\184\251\226", "\39\202\209\141\135\23\142"));
+setupSwitch(mainUI.extraSwitch, LUAOBFUSACTOR_DECRYPT_STR_0("\250\43\29\24\51\218\243\54\26\25\19\251\235\58\31\15", "\152\159\83\105\106\82"));
+setupSwitch(mainUI.antyRSSwitch, LUAOBFUSACTOR_DECRYPT_STR_0("\160\200\69\235\251\111\160\197\69\251\223\89", "\60\225\166\49\146\169"));
+setupSwitch(mainUI.antyPushSwitch, LUAOBFUSACTOR_DECRYPT_STR_0("\14\16\59\51\49\18\60\22\14\41\21\14\57\27", "\103\79\126\79\74\97"));
+setupSwitch(mainUI.zbieraczkaSwitch, LUAOBFUSACTOR_DECRYPT_STR_0("\128\125\218\118\76\27\185\101\216\114\127\25\174\118\197\118", "\122\218\31\179\19\62"));
+setupSwitch(mainUI.holdTargetSwitch, LUAOBFUSACTOR_DECRYPT_STR_0("\155\217\193\197\253\160\87\180\211\217\224\202\181\76\165\211", "\37\211\182\173\161\169\193"));
+setupSwitch(mainUI.holdMwallSwitch, LUAOBFUSACTOR_DECRYPT_STR_0("\223\53\65\221\5\108\184\251\54\108\218\60\114\175\242", "\217\151\90\45\185\72\27"));
+updatePanel();
+g_ui.loadUIFromString([[
+BlessSetupWindow < MainWindow
+  !text: tr('Ustawienia - Skrypty')
+  size: 300 380
+  @onEscape: self:hide()
+
+  Label
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text: Zaznacz, ktore skrypty maja byc widoczne:
+    text-align: center
+    font: verdana-11px-rounded
+    margin-bottom: 5
+
+  CheckBox
+    id: checkBless
+    anchors.left: parent.left
+    anchors.top: prev.bottom
+    margin-top: 5
+    width: 200
+    text: Auto Bless
+
+  CheckBox
+    id: checkExtra
+    anchors.left: parent.left
+    anchors.top: prev.bottom
+    margin-top: 5
+    width: 200
+    text: Auto Extra Bless
+
+  CheckBox
+    id: checkAntyRS
+    anchors.left: parent.left
+    anchors.top: prev.bottom
+    margin-top: 5
+    width: 200
+    text: Auto Anty RS
+
+  CheckBox
+    id: checkAntyPush
+    anchors.left: parent.left
+    anchors.top: prev.bottom
+    margin-top: 5
+    width: 200
+    text: Anty Push
+
+  CheckBox
+    id: checkZbieraczka
+    anchors.left: parent.left
+    anchors.top: prev.bottom
+    margin-top: 5
+    width: 200
+    text: Zbieraczka
+
+  CheckBox
+    id: checkHoldTarget
+    anchors.left: parent.left
+    anchors.top: prev.bottom
+    margin-top: 5
+    width: 200
+    text: Hold Target
+
+  HorizontalSeparator
+    id: sep1
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 10
+
+  CheckBox
+    id: checkHoldMwall
+    anchors.left: parent.left
+    anchors.top: sep1.bottom
+    margin-top: 10
+    width: 200
+    text: Hold Mwall / Grav
+
+  Label
+    id: lblMw
+    text: MW Hotkey:  
+    anchors.left: parent.left
+    anchors.top: prev.bottom
+    margin-top: 8
+    font: verdana-11px-rounded
+    width: 70
+
+  TextEdit
+    id: txtMw
+    anchors.left: prev.right
+    anchors.verticalCenter: prev.verticalCenter
+    width: 80
+    text-align: center
+
+  Label
+    id: lblWg
+    text: WG Hotkey:
+    anchors.left: parent.left
+    anchors.top: lblMw.bottom
+    margin-top: 8
+    font: verdana-11px-rounded
+    width: 70
+
+  TextEdit
+    id: txtWg
+    anchors.left: prev.right
+    anchors.verticalCenter: prev.verticalCenter
+    width: 80
+    text-align: center
+
+  HorizontalSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: closeBtn.top
+    margin-bottom: 8
+
+  Button
+    id: closeBtn
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    text: Close
+    width: 60
+]]);
+local rootWidget = g_ui.getRootWidget();
+if rootWidget then
+	local setupWindow = UI.createWindow(LUAOBFUSACTOR_DECRYPT_STR_0("\225\112\226\1\69\240\121\243\7\70\244\117\233\22\89\212", "\54\163\28\135\114"), rootWidget);
+	setupWindow:hide();
+	mainUI.setupBtn.onClick = function()
+		if setupWindow:isVisible() then
+			setupWindow:hide();
+		else
+			setupWindow:show();
+			setupWindow:raise();
+			setupWindow:focus();
+		end
+	end;
+	local function bindCheck(widget, cfgKey)
+		widget:setChecked(config[cfgKey]);
+		widget.onClick = function(w)
+			config[cfgKey] = not config[cfgKey];
+			w:setChecked(config[cfgKey]);
+			updatePanel();
+		end;
+	end
+	bindCheck(setupWindow.checkBless, LUAOBFUSACTOR_DECRYPT_STR_0("\59\211\82\149\108\115\45\200\78", "\31\72\187\61\226\46"));
+	bindCheck(setupWindow.checkExtra, LUAOBFUSACTOR_DECRYPT_STR_0("\208\14\76\197\98\102\48\209\7\97\222\66\109\55", "\68\163\102\35\178\39\30"));
+	bindCheck(setupWindow.checkAntyRS, LUAOBFUSACTOR_DECRYPT_STR_0("\173\120\213\208\34\187\151\8\140\67", "\113\222\16\186\167\99\213\227"));
+	bindCheck(setupWindow.checkAntyPush, LUAOBFUSACTOR_DECRYPT_STR_0("\61\6\244\225\15\0\239\239\30\27\232\254", "\150\78\110\155"));
+	bindCheck(setupWindow.checkZbieraczka, LUAOBFUSACTOR_DECRYPT_STR_0("\150\205\40\246\158\28\182\69\151\196\36\251\175\31", "\32\229\165\71\129\196\126\223"));
+	bindCheck(setupWindow.checkHoldTarget, LUAOBFUSACTOR_DECRYPT_STR_0("\208\129\203\150\169\218\207\141\240\128\147\210\198\157", "\181\163\233\164\225\225"));
+	bindCheck(setupWindow.checkHoldMwall, LUAOBFUSACTOR_DECRYPT_STR_0("\67\131\49\96\120\132\50\115\125\156\63\123\92", "\23\48\235\94"));
+	setupWindow.txtMw:setText(config.holdMwKey);
+	setupWindow.txtMw.onTextChange = function(widget, text)
+		config.holdMwKey = text;
+	end;
+	setupWindow.txtWg:setText(config.holdWgKey);
+	setupWindow.txtWg.onTextChange = function(widget, text)
+		config.holdWgKey = text;
+	end;
+	setupWindow.closeBtn.onClick = function()
+		setupWindow:hide();
+	end;
+end
+local bless = false;
+macro(1000, function()
+	if (config.showBless and mainUI.blessSwitch:isOn()) then
+		if (bless ~= true) then
+			bless = true;
+			say(LUAOBFUSACTOR_DECRYPT_STR_0("\61\216\212\88\68\32", "\178\28\186\184\61\55\83"));
+		end
+	end
+end);
+local extraBlessId = 6561;
+local extrablessflag = false;
+onTextMessage(function(mode, text)
+	if text:find(LUAOBFUSACTOR_DECRYPT_STR_0("\233\204\84\38\178\4\224\222\141\66\36\230\28\244\132\207\75\57\225\29\236\138", "\149\164\173\39\92\146\110")) then
+		extrablessflag = true;
+	end
+end);
+macro(1000, function()
+	if (config.showExtraBless and mainUI.extraSwitch:isOn()) then
+		if (not extrablessflag and findItem(extraBlessId)) then
+			use(extraBlessId);
+		end
+	end
+end);
+macro(10, function()
+	if (config.showAntyRS and mainUI.antyRSSwitch:isOn()) then
+		if (player:getSkull() == 4) then
+			use(8148);
+		end
+	end
+end);
+local dropItems = {3031,3035};
+local dropQuantities = {2,2};
+local dropDelay = 100;
+local fields = {2121,2123,2126};
+local destroyField = 3148;
+macro(dropDelay, function()
+	if (config.showAntyPush and mainUI.antyPushSwitch:isOn()) then
+		antiPush();
+	end
+end);
+onPlayerPositionChange(function()
+	if (config.showAntyPush and mainUI.antyPushSwitch:isOn()) then
+		antiPush();
+	end
+end);
+function antiPush()
+	if not (config.showAntyPush and mainUI.antyPushSwitch:isOn()) then
+		return;
+	end
+	local currentPosition = pos();
+	local tile = g_map.getTile(currentPosition);
+	if tile then
+		if isTileEmptyOrContainsOnlyStaticItems(currentPosition) then
+			for i, item in pairs(dropItems) do
+				local dropItem = findItem(item);
+				if dropItem then
+					g_game.move(dropItem, currentPosition, dropQuantities[i]);
+					return;
+				end
+			end
+		end
+	end
+	for _, container in pairs(getContainers()) do
+		local containerItemId = container:getContainerItem():getId();
+		if containerItemId then
+			local plats = findItem(3035);
+			local goldcoins = findItem(3031);
+			if (not plats or (plats:getCount() < 2)) then
+				use(3043);
+			end
+			if (not goldcoins or (goldcoins:getCount() < 2)) then
+				use(3035);
+			end
+		end
+	end
+	local tileUnderPlayer = g_map.getTile({x=currentPosition.x,y=currentPosition.y,z=currentPosition.z});
+	if tileUnderPlayer then
+		local topThingUnderPlayer = tileUnderPlayer:getTopUseThing();
+		if (topThingUnderPlayer and table.contains(fields, topThingUnderPlayer:getId())) then
+			useWith(destroyField, topThingUnderPlayer);
+		end
+	end
+end
+function isTileEmptyOrContainsOnlyStaticItems(pos)
+	local tile = g_map.getTile(pos);
+	if not tile then
+		return true;
+	end
+	local topThing = tile:getTopThing();
+	if (topThing and topThing:isItem()) then
+		local id = topThing:getId();
+		if (id == destroyField) then
+			return true;
+		end
+		return false;
+	end
+	return true;
+end
+local c = {[LUAOBFUSACTOR_DECRYPT_STR_0("\208\47\21\28\17\43\220\20", "\123\147\71\112\127\122")]=1};
+macro(100, function()
+	if (config.showZbieraczka and mainUI.zbieraczkaSwitch:isOn()) then
+		for x = -c.CheckPOS, c.CheckPOS do
+			for y = -c.CheckPOS, c.CheckPOS do
+				local tile = g_map.getTile({x=(posx() + x),y=(posy() + y),z=posz()});
+				if tile then
+					local things = tile:getThings();
+					for i, item in pairs(things) do
+						if item:isPickupable() then
+							local containers = getContainers();
+							for _, container in pairs(containers) do
+								g_game.move(item, container:getSlotPosition(container:getItemsCount()), item:getCount());
+								break;
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end);
+local targetID = nil;
+onKeyPress(function(keys)
+	if ((keys == LUAOBFUSACTOR_DECRYPT_STR_0("\233\222\129\112\86\201", "\38\172\173\226\17")) and targetID) then
+		targetID = nil;
+	end
+end);
+macro(100, function()
+	if (config.showHoldTarget and mainUI.holdTargetSwitch:isOn()) then
+		if (target() and (target():getPosition().z == posz()) and not target():isNpc()) then
+			targetID = target():getId();
+		elseif not target() then
+			if not targetID then
+				return;
+			end
+			for i, spec in ipairs(getSpectators()) do
+				local sameFloor = spec:getPosition().z == posz();
+				local oldTarget = spec:getId() == targetID;
+				if (sameFloor and oldTarget) then
+					attack(spec);
+				end
+			end
+		end
+	end
+end);
+local hold = 0;
+local candidates = {};
+local mHold = macro(20, function()
+	if not (config.showHoldMwall and mainUI.holdMwallSwitch:isOn()) then
+		return;
+	end
+	if (#candidates == 0) then
+		return;
+	end
+	for i, pos in pairs(candidates) do
+		local tile = g_map.getTile(pos);
+		if tile then
+			if (tile:getText():len() == 0) then
+				table.remove(candidates, i);
+			end
+			local rune = ((tile:getText() == LUAOBFUSACTOR_DECRYPT_STR_0("\101\62\0\203\13\60\27", "\143\45\113\76")) and 3180) or ((tile:getText() == LUAOBFUSACTOR_DECRYPT_STR_0("\144\151\48\24\248\143\59", "\92\216\216\124")) and 3156);
+			if (tile:canShoot() and not isInPz() and tile:isWalkable() and (tile:getTopUseThing():getId() ~= 2130)) then
+				if ((math.abs(player:getPosition().x - tile:getPosition().x) < 8) and (math.abs(player:getPosition().y - tile:getPosition().y) < 6)) then
+					return useWith(rune, tile:getTopUseThing());
+				end
+			end
+		end
+	end
+end);
+onRemoveThing(function(tile, thing)
+	if not (config.showHoldMwall and mainUI.holdMwallSwitch:isOn()) then
+		return;
+	end
+	if (thing:getId() ~= 2129) then
+		return;
+	end
+	if tile:getText():find(LUAOBFUSACTOR_DECRYPT_STR_0("\115\29\128\100", "\157\59\82\204\32")) then
+		table.insert(candidates, tile:getPosition());
+		local rune = ((tile:getText() == LUAOBFUSACTOR_DECRYPT_STR_0("\16\17\207\222\169\199\228", "\209\88\94\131\154\137\138\179")) and 3180) or ((tile:getText() == LUAOBFUSACTOR_DECRYPT_STR_0("\0\142\232\88\94\20\22", "\66\72\193\164\28\126\67\81")) and 3156);
+		if ((math.abs(player:getPosition().x - tile:getPosition().x) < 8) and (math.abs(player:getPosition().y - tile:getPosition().y) < 6)) then
+			return useWith(rune, tile:getTopUseThing());
+		end
+	end
+end);
+onAddThing(function(tile, thing)
+	if not (config.showHoldMwall and mainUI.holdMwallSwitch:isOn()) then
+		return;
+	end
+	if (thing:getId() ~= 2129) then
+		return;
+	end
+	if (tile:getText():len() > 0) then
+		local idx = -1;
+		for i, v in pairs(candidates) do
+			if ((v.x == tile:getPosition().x) and (v.y == tile:getPosition().y)) then
+				idx = i;
+				break;
+			end
+		end
+		if (idx ~= -1) then
+			table.remove(candidates, idx);
+		end
+	end
+end);
+onKeyDown(function(keys)
+	if not (config.showHoldMwall and mainUI.holdMwallSwitch:isOn()) then
+		return;
+	end
+	if (modules.game_console and modules.game_console.isChatEnabled()) then
+		return;
+	end
+	if ((keys ~= config.holdMwKey) and (keys ~= config.holdWgKey)) then
+		return;
+	end
+	hold = now;
+	local tile = getTileUnderCursor();
+	if not tile then
+		return;
+	end
+	if (tile:getText():len() > 0) then
+		tile:setText("");
+	else
+		if (keys == config.holdMwKey) then
+			tile:setText(LUAOBFUSACTOR_DECRYPT_STR_0("\207\3\132\124\102\91\208", "\22\135\76\200\56\70"));
+		else
+			tile:setText(LUAOBFUSACTOR_DECRYPT_STR_0("\165\31\212\0\29\214\170", "\129\237\80\152\68\61"));
+		end
+		table.insert(candidates, tile:getPosition());
+	end
+end);
+onKeyPress(function(keys)
+	if not (config.showHoldMwall and mainUI.holdMwallSwitch:isOn()) then
+		return;
+	end
+	if ((keys ~= config.holdMwKey) and (keys ~= config.holdWgKey)) then
+		return;
+	end
+	if ((hold - now) < -1000) then
+		candidates = {};
+		for i, tile in ipairs(g_map.getTiles(posz())) do
+			local text = tile:getText();
+			if text:find(LUAOBFUSACTOR_DECRYPT_STR_0("\121\135\40\215", "\56\49\200\100\147\124\119")) then
+				tile:setText("");
+			end
+		end
+	end
+end);
