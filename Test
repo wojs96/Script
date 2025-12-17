@@ -31,15 +31,12 @@ end
 
 local _original_macro = macro
 macro = function(delay, funcOrName, func)
-    -- Tworzymy wrapper na funkcję makra
     local callback = func
     if type(funcOrName) == "function" then callback = funcOrName end
     
     local protectedCallback = function()
-        -- Jeśli token w storage jest inny niż mój, znaczy że załadowano nowszą wersję skryptu
-        if not isCurrentInstance() then 
-            return -- Przerywamy działanie starego makra
-        end
+        -- Jeśli token w storage jest inny niż mój, stary skrypt przestaje działać
+        if not isCurrentInstance() then return end
         if callback then callback() end
     end
 
@@ -49,8 +46,6 @@ macro = function(delay, funcOrName, func)
     else
         m = _original_macro(delay, protectedCallback)
     end
-    
-    -- Dodatkowy bezpiecznik: sprawdzamy co cykl czy makro nie powinno się samo wyłączyć
     return m
 end
 
@@ -74,7 +69,7 @@ onTextMessage = function(callback)
     end
 end
 
--- Helper do UI - aby przypisywać ID
+-- Helper do UI
 local _original_setupUI = setupUI
 setupUI = function(definition, parent)
     local w = _original_setupUI(definition, parent)
@@ -190,8 +185,10 @@ addSeparator()
 addLabel("", "Guild Scripts")
 addSeparator()
 
+-- ZMIENNA GLOBALNA dla makra (ważne dla listy skryptów)
 guildhealing = macro(9999, "Guild Healing", function() end)
 
+-- ZMIENNA LOKALNA dla makra (ważne dla listy skryptów)
 local recognizeMacro = macro(9999, "Marker", function() end)
 
 local myVocation
@@ -1596,7 +1593,7 @@ end)
 
 -- --- LISTA SKRYPTÓW (MANAGER) ---
 local scriptsList = {
-    -- Dodane nowe wpisy, aby zachowywały stan
+    -- TUTAJ DODAŁEM TWOJE BRAKUJĄCE MAKRA
     { key = "GuildHealing_V15", label = "Guild Healing", defaultId = 3160, macro = guildhealing, defaultText="GHeal" },
     { key = "Recognize_V15",    label = "Marker Recog",  defaultId = 3031, macro = recognizeMacro, defaultText="Marker" },
 
@@ -1914,37 +1911,37 @@ for _, s in ipairs(scriptsList) do
     end
 end
 
-local initDone = false 
-
-macro(200, function()
-    if not initDone then
-        for _, s in ipairs(scriptsList) do
-            if s.macro then
-                local savedState = config["state" .. s.key]
-                if savedState == true then
-                    safeSetOn(s.macro)
-                else
-                    safeSetOff(s.macro)
-                end
-                
-                local widget = activeWidgets[s.key]
-                if widget then
-                    if savedState == true then
-                        if widget.setOn then widget:setOn(true) end
-                        if widget.setChecked then widget:setChecked(true) end
-                    else
-                        if widget.setOff then widget:setOff() end
-                        if widget.setChecked then widget:setChecked(false) end
-                    end
-                end
-            end
+-- ==========================================================
+-- PRZYWRACANIE STANU (Natychmiastowe)
+-- ==========================================================
+for _, s in ipairs(scriptsList) do
+    if s.macro then
+        local savedState = config["state" .. s.key]
+        if savedState == true then
+            s.macro.setOn()
+        else
+            s.macro.setOff()
         end
         
-        systemLoading = false -- Zdejmujemy bezpiecznik
-        initDone = true 
-        return 
+        local widget = activeWidgets[s.key]
+        if widget then
+            if savedState == true then
+                if widget.setOn then widget:setOn(true) end
+                if widget.setChecked then widget:setChecked(true) end
+            else
+                if widget.setOff then widget:setOff() end
+                if widget.setChecked then widget:setChecked(false) end
+            end
+        end
     end
+end
 
+systemLoading = false -- Zdejmujemy bezpiecznik
+
+-- ==========================================================
+-- ZAPISYWANIE STANU (Pętla)
+-- ==========================================================
+macro(500, function()
     for _, s in ipairs(scriptsList) do
         if s.macro then
             local isMacroOn = s.macro.isOn()
