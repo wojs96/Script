@@ -51,8 +51,6 @@ macro = function(delay, funcOrName, func)
     end
     
     -- Dodatkowy bezpiecznik: sprawdzamy co cykl czy makro nie powinno się samo wyłączyć
-    -- (Niektóre boty nie pozwalają łatwo "wyłączyć" makra z wnętrza makra, 
-    -- ale 'return' w protectedCallback załatwia sprawę logiki)
     return m
 end
 
@@ -80,11 +78,6 @@ end
 local _original_setupUI = setupUI
 setupUI = function(definition, parent)
     local w = _original_setupUI(definition, parent)
-    -- Jeśli to nasz główny panel, nadajemy mu ID do późniejszego znalezienia
-    if not parent or parent == modules.game_interface.getMapPanel() then
-         -- Próbujemy zgadnąć czy to główny panel po rozmiarze lub dzieciach, 
-         -- ale dla pewności nadamy ID ręcznie w kodzie niżej.
-    end
     return w
 end
 
@@ -1603,6 +1596,10 @@ end)
 
 -- --- LISTA SKRYPTÓW (MANAGER) ---
 local scriptsList = {
+    -- Dodane nowe wpisy, aby zachowywały stan
+    { key = "GuildHealing_V15", label = "Guild Healing", defaultId = 3160, macro = guildhealing, defaultText="GHeal" },
+    { key = "Recognize_V15",    label = "Marker Recog",  defaultId = 3031, macro = recognizeMacro, defaultText="Marker" },
+
     { key = "Bless_V15", label = "Auto Bless", defaultId = 3035, macro = BlessMacro, defaultText="Bless" },
     { key = "ExtraBless_V15", label = "Extra Bless", defaultId = 6561, macro = ExtraBlessMacro, defaultText="ExtraBless" },
     { key = "AntyRS_V15", label = "Anty RS", defaultId = 8148, macro = AntyRSMacro, defaultText="AntyRS" },
