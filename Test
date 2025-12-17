@@ -1,3 +1,4 @@
+
 -- Generujemy unikalny token dla TEJ KONKRETNEJ instancji skryptu
 local INSTANCE_ID = os.time() .. "_" .. math.random(10000, 99999)
 storage.CurrentScriptToken = INSTANCE_ID
