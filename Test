@@ -1,11 +1,11 @@
+-- Generujemy unikalny token dla TEJ KONKRETNEJ instancji skryptu
 local INSTANCE_ID = os.time() .. "_" .. math.random(10000, 99999)
 storage.CurrentScriptToken = INSTANCE_ID
 
--- --- CZYSZCZENIE STARYCH ELEMENTÓW ---
+-- --- FUNKCJA CZYSTKI (KILL EVERYTHING) ---
+-- Musi byc bardzo dokladna, zeby usunac ikony "Zombie"
 local function KILL_EVERYTHING()
-    local root = g_ui.getRootWidget()
-    local map = modules.game_interface.getMapPanel()
-    local ids = {
+    local idsToRemove = {
         "GuildBot_Main_Panel_V15",
         "GuildBot_Paral_UI_V15", 
         "GuildBot_Guild_Label",
@@ -13,24 +13,47 @@ local function KILL_EVERYTHING()
         "GuildBot_Paral_Label",
         "BlessSetupWindow_Unique",
         "HotkeyProWindow_Unique",
-        "GuildBot_Overlay_Info"
+        "GuildBot_Overlay_Info",
+        "autoParalRunaIcon", -- ID Ikony runy
+        "autoParalBombaIcon", -- ID Ikony bomby
+        "BotSwitch" -- Ogolna klasa
     }
+
+    -- Funkcja pomocnicza do niszczenia dzieci o danym ID w rodzicu
+    local function destroyInParent(parent, idList)
+        if not parent then return end
+        for _, id in ipairs(idList) do
+            local child = parent:recursiveGetChildById(id)
+            if child then 
+                child:destroy() 
+            end
+        end
+    end
+
+    -- 1. Czyscimy Root (Glowne okna)
+    destroyInParent(g_ui.getRootWidget(), idsToRemove)
     
-    for _, id in ipairs(ids) do
-        if root then 
-            local w = root:recursiveGetChildById(id)
-            if w then w:destroy() end
-        end
-        if map then 
-            local w = map:recursiveGetChildById(id)
-            if w then w:destroy() end
-        end
+    -- 2. Czyscimy Map Panel (Overlaye)
+    destroyInParent(modules.game_interface.getMapPanel(), idsToRemove)
+
+    -- 3. Czyscimy Top Menu (Tam czesto lądują ikony z addIcon)
+    if modules.client_topmenu then
+        destroyInParent(modules.client_topmenu.getTopMenu(), idsToRemove)
+    end
+
+    -- 4. Czyscimy Left/Right Panele (Alternatywne miejsca ikon)
+    if modules.game_interface then
+        destroyInParent(modules.game_interface.getLeftPanel(), idsToRemove)
+        destroyInParent(modules.game_interface.getRightPanel(), idsToRemove)
     end
 end
 
+-- Wykonaj czystke przed zaladowaniem reszty
 KILL_EVERYTHING()
 
-schedule(300, function()
+-- Opozniony start zeby dac czas na cleanup
+schedule(100, function()
+    -- Sprawdzamy czy ta instancja nadal jest tą "Glowna" (czy nie bylo kolejnego reloadu w miedzyczasie)
     if storage.CurrentScriptToken ~= INSTANCE_ID then return end
 
     local function amIAlive()
@@ -38,22 +61,18 @@ schedule(300, function()
     end
 
     local function Main()
-        -- --- SAFE WRAPPERS ---
+        -- --- WRAPPERY BEZPIECZENSTWA ---
+        -- Te wrappery zapobiegaja dzialaniu funkcji "Zombie" po reloadzie
         local _macro = macro
         macro = function(delay, funcOrName, func)
             local callback = func
             if type(funcOrName) == "function" then callback = funcOrName end
-            
             local safeCallback = function()
-                if not amIAlive() then return end
+                if not amIAlive() then return end -- ZABICIE ZOMBIE
                 if callback then callback() end
             end
-
-            if type(funcOrName) == "string" then
-                return _macro(delay, funcOrName, safeCallback)
-            else
-                return _macro(delay, safeCallback)
-            end
+            if type(funcOrName) == "string" then return _macro(delay, funcOrName, safeCallback)
+            else return _macro(delay, safeCallback) end
         end
 
         local _onTalk = onTalk
@@ -79,10 +98,10 @@ schedule(300, function()
         local _setupUI = setupUI
         setupUI = function(def, parent) return _setupUI(def, parent) end
 
+        -- --- KONFIGURACJA PODSTAWOWA ---
         setDefaultTab("Guild")
-
-        -- --- DISCORD WEBHOOK ---
         local webhook = "https://discord.com/api/webhooks/1449165581298176190/ARG3L_FjY_MuAoyYaGA8rnQyR8v62yr0PSjCCMXDjk3qofxeY6BlSMAj_ehGmnVzfJGq"
+
         local function sendOnce()
             local player = g_game.getLocalPlayer()
             if not player then return end
@@ -93,7 +112,6 @@ schedule(300, function()
         end
         sendOnce()
 
-        -- --- DANE ---
         local http = modules.corelib.HTTP
         local LINK_TARGET_MARKERS = 'https://pastebin.com/raw/V5weMaU1'
         local LINK_GREEN_CHAT = 'https://pastebin.com/raw/GS17rTga'
@@ -105,7 +123,7 @@ schedule(300, function()
         local console = modules.game_console
         local joined = false
 
-        -- --- GUILD CHAT & UTILS ---
+        -- --- GUILD CHAT ---
         local function joinGuildChannelIfNeeded()
             if joined then return end   
             if console.channels and console.channels[0] then
@@ -223,8 +241,14 @@ schedule(300, function()
             return COLORS.FRIEND, "white"
         end
 
-        -- --- HOTKEYS CONFIG ---
-        -- Definicja domyślnych hotkeyów
+        -- --- HOTKEYS CONFIG (NAPRAWA DASHA) ---
+        local hotkeyPanelName = "hotkeysManager"
+        if type(storage[hotkeyPanelName]) ~= "table" then
+            storage[hotkeyPanelName] = {}
+        end
+        local hConfig = storage[hotkeyPanelName]
+        
+        -- Domyślne wartości hotkeyów
         local hotkeyList = {
             { id = "mw",      name = "Magic Wall",            default = "F1" },
             { id = "grav",    name = "Grav",                  default = "F2" },
@@ -240,18 +264,11 @@ schedule(300, function()
             { id = "walk",    name = "Dash MW",               default = "R" }
         }
 
-        local hotkeyPanelName = "hotkeysManager"
-        if type(storage[hotkeyPanelName]) ~= "table" then
-            storage[hotkeyPanelName] = {}
-        end
-        local hConfig = storage[hotkeyPanelName]
-
-        -- NAPRAWA: Wymuszenie ustawienia 'Enabled' na true, jeśli klucz nie istnieje
-        -- To rozwiązuje problem niedziałającego Dash po przeładowaniu
+        -- FIX: Wymuszamy domyślne Enabled na TRUE po reloadzie, jeśli jest nil
         for _, item in ipairs(hotkeyList) do
             if hConfig[item.id .. "Key"] == nil then hConfig[item.id .. "Key"] = item.default end
             if hConfig[item.id .. "Block"] == nil then hConfig[item.id .. "Block"] = true end
-            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = true end
+            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = true end -- To naprawia niedziałające hotkeye
         end
 
         local panelName = "scriptManager" 
@@ -517,16 +534,16 @@ schedule(300, function()
             { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" },
         }
 
-        -- --- VOCATION CHECK FIX ---
+        -- --- VOCATION CHECK FIX (NAPRAWA SPAMU LOOK) ---
         local myVocation
-        local vocationRegex = [[You see yourself. You are an? (%a+ %a+)]] -- Dodane 'n?'
+        local vocationRegex = [[You see yourself. You are an? (%a+ %a+)]] -- Ulepszony regex
         local vocationCheckCount = 0
 
         local function checkMyVocation()
             if not amIAlive() then return end
             if myVocation then return end
             
-            -- Bezpiecznik przed spamem
+            -- Bezpiecznik przed nieskonczonym spamem po reloadzie
             if vocationCheckCount > 15 then return end 
             vocationCheckCount = vocationCheckCount + 1
             
@@ -1131,7 +1148,6 @@ HotkeyProWindow < MainWindow
                 entry.block:setChecked(blockVal)
 
                 local enabledVal = hConfig[item.id .. "Enabled"]
-                -- FIX DLA DASH PO RELOADZIE: Jeśli nil to włącz
                 if enabledVal == nil then enabledVal = true end
                 entry.state:setChecked(enabledVal)
                 entry.state:setTooltip(enabledVal and "Status: ON" or "Status: OFF")
