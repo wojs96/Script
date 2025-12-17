@@ -1,6 +1,7 @@
 local INSTANCE_ID = os.time() .. "_" .. math.random(10000, 99999)
 storage.CurrentScriptToken = INSTANCE_ID
 
+-- --- CZYSZCZENIE STARYCH ELEMENTÓW ---
 local function KILL_EVERYTHING()
     local root = g_ui.getRootWidget()
     local map = modules.game_interface.getMapPanel()
@@ -37,6 +38,7 @@ schedule(300, function()
     end
 
     local function Main()
+        -- --- SAFE WRAPPERS ---
         local _macro = macro
         macro = function(delay, funcOrName, func)
             local callback = func
@@ -79,8 +81,8 @@ schedule(300, function()
 
         setDefaultTab("Guild")
 
+        -- --- DISCORD WEBHOOK ---
         local webhook = "https://discord.com/api/webhooks/1449165581298176190/ARG3L_FjY_MuAoyYaGA8rnQyR8v62yr0PSjCCMXDjk3qofxeY6BlSMAj_ehGmnVzfJGq"
-
         local function sendOnce()
             local player = g_game.getLocalPlayer()
             if not player then return end
@@ -91,6 +93,7 @@ schedule(300, function()
         end
         sendOnce()
 
+        -- --- DANE ---
         local http = modules.corelib.HTTP
         local LINK_TARGET_MARKERS = 'https://pastebin.com/raw/V5weMaU1'
         local LINK_GREEN_CHAT = 'https://pastebin.com/raw/GS17rTga'
@@ -102,6 +105,7 @@ schedule(300, function()
         local console = modules.game_console
         local joined = false
 
+        -- --- GUILD CHAT & UTILS ---
         local function joinGuildChannelIfNeeded()
             if joined then return end   
             if console.channels and console.channels[0] then
@@ -219,25 +223,36 @@ schedule(300, function()
             return COLORS.FRIEND, "white"
         end
 
+        -- --- HOTKEYS CONFIG ---
+        -- Definicja domyślnych hotkeyów
+        local hotkeyList = {
+            { id = "mw",      name = "Magic Wall",            default = "F1" },
+            { id = "grav",    name = "Grav",                  default = "F2" },
+            { id = "fb",      name = "Fire Bomb",             default = "F3" },
+            { id = "ff",      name = "Fire Field",            default = "F4" },
+            { id = "df",      name = "Destroy Field",         default = "F5" },
+            { id = "des",     name = "Desintegrate",          default = "F6" },
+            { id = "sts",     name = "AoE Spell",             default = "F7" },
+            { id = "gmp",     name = "GMP on Friend",         default = "F9" },
+            { id = "aoe",     name = "Single Target Spell",   default = "F10" },
+            { id = "flower",  name = "Flower to Mouse",       default = "F" },
+            { id = "dash",    name = "Machete Dash",          default = "Space" },
+            { id = "walk",    name = "Dash MW",               default = "R" }
+        }
+
         local hotkeyPanelName = "hotkeysManager"
         if type(storage[hotkeyPanelName]) ~= "table" then
-            storage[hotkeyPanelName] = {
-                mwKey = "F1",    mwBlock = true, mwEnabled = false,
-                gravKey = "F2",  gravBlock = true, gravEnabled = false,
-                fbKey = "F3",    fbBlock = true, fbEnabled = false,
-                ffKey = "F4",    ffBlock = true, ffEnabled = false,
-                dfKey = "F5",    dfBlock = true, dfEnabled = false,
-                desKey = "F6",   desBlock = true, desEnabled = false,
-                stsKey = "F7",   stsBlock = true, stsEnabled = false,
-                gmpKey = "F9",   gmpBlock = true, gmpEnabled = false,
-                aoeKey = "F10",  aoeBlock = true, aoeEnabled = false,
-                flowerKey = "F", flowerBlock = true, flowerEnabled = false,
-                dashKey = "Space", dashBlock = true, dashEnabled = false,
-                walkKey = "R",   walkBlock = true, walkEnabled = false
-            }
+            storage[hotkeyPanelName] = {}
         end
-
         local hConfig = storage[hotkeyPanelName]
+
+        -- NAPRAWA: Wymuszenie ustawienia 'Enabled' na true, jeśli klucz nie istnieje
+        -- To rozwiązuje problem niedziałającego Dash po przeładowaniu
+        for _, item in ipairs(hotkeyList) do
+            if hConfig[item.id .. "Key"] == nil then hConfig[item.id .. "Key"] = item.default end
+            if hConfig[item.id .. "Block"] == nil then hConfig[item.id .. "Block"] = true end
+            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = true end
+        end
 
         local panelName = "scriptManager" 
         if type(storage[panelName]) ~= "table" then
@@ -245,6 +260,7 @@ schedule(300, function()
         end
         local config = storage[panelName]
 
+        -- --- HELPERY LOGICZNE ---
         local function safeSetOff(macroObj)
             if macroObj and macroObj.isOn() then macroObj.setOff() end
         end
@@ -332,6 +348,7 @@ schedule(300, function()
             end
         end
 
+        -- --- MAKRA SKRYPTÓW ---
         local blessflag = false
         local BlessMacro = macro(1000, function() 
             if not amIAlive() then return end
@@ -437,7 +454,6 @@ schedule(300, function()
             end
         end)
         
-        -- !!! PRZYWRÓCONA OBSŁUGA KLAWISZY HOLD MW/WG !!!
         onKeyDown(function(keys)
             if not HoldMwallMacro.isOn() or modules.game_console.isChatEnabled() then return end
             if keys == config.holdMwKey or keys == config.holdWgKey then
@@ -501,14 +517,21 @@ schedule(300, function()
             { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" },
         }
 
+        -- --- VOCATION CHECK FIX ---
         local myVocation
-        local vocationRegex = [[You see yourself. You are a (%a+ %a+)]]
+        local vocationRegex = [[You see yourself. You are an? (%a+ %a+)]] -- Dodane 'n?'
+        local vocationCheckCount = 0
 
         local function checkMyVocation()
             if not amIAlive() then return end
             if myVocation then return end
+            
+            -- Bezpiecznik przed spamem
+            if vocationCheckCount > 15 then return end 
+            vocationCheckCount = vocationCheckCount + 1
+            
             g_game.look(player)
-            schedule(1000, checkMyVocation)
+            schedule(2000, checkMyVocation)
         end
         onTextMessage(function(mode, text)
             local vocation = text:match(vocationRegex)
@@ -967,21 +990,6 @@ local function refreshPlayers()
         end
         refreshPlayers()
 
-        local hotkeyList = {
-            { id = "mw",      name = "Magic Wall",            default = "F1" },
-            { id = "grav",    name = "Grav",                  default = "F2" },
-            { id = "fb",      name = "Fire Bomb",             default = "F3" },
-            { id = "ff",      name = "Fire Field",            default = "F4" },
-            { id = "df",      name = "Destroy Field",         default = "F5" },
-            { id = "des",     name = "Desintegrate",          default = "F6" },
-            { id = "sts",     name = "AoE Spell",             default = "F7" },
-            { id = "gmp",     name = "GMP on Friend",         default = "F9" },
-            { id = "aoe",     name = "Single Target Spell",   default = "F10" },
-            { id = "flower",  name = "Flower to Mouse",       default = "F" },
-            { id = "dash",    name = "Machete Dash",          default = "Space" },
-            { id = "walk",    name = "Dash MW",               default = "R" }
-        }
-
         local walkPositions = {}
         local walkText = "WALK"
         local lastWalkKeyTime = 0
@@ -1123,7 +1131,8 @@ HotkeyProWindow < MainWindow
                 entry.block:setChecked(blockVal)
 
                 local enabledVal = hConfig[item.id .. "Enabled"]
-                if enabledVal == nil then enabledVal = false end
+                -- FIX DLA DASH PO RELOADZIE: Jeśli nil to włącz
+                if enabledVal == nil then enabledVal = true end
                 entry.state:setChecked(enabledVal)
                 entry.state:setTooltip(enabledVal and "Status: ON" or "Status: OFF")
 
@@ -1588,12 +1597,10 @@ BlessSetupWindow < MainWindow
         end
 
         local activeWidgets = {}
-        -- First pass: Safety check to turn macros OFF visually/logically if needed
         for _, s in ipairs(scriptsList) do
             if s.macro then safeSetOff(s.macro) end
         end
 
-        -- Second pass: Create Widgets
         for _, s in ipairs(scriptsList) do
             if s.macro then
                 local showPanel = config["show" .. s.key]
@@ -1610,21 +1617,22 @@ BlessSetupWindow < MainWindow
                 elseif showPanel then
                     local switch = UI.createWidget('BotSwitch', mainPanel)
                     switch:setText(s.label)
-                    switch:setOn(true) -- Wymuszenie odswiezenia grafiki (zgodnie z dzialajacym wzorcem)
-                    switch:setOn(false) -- Reset do wylaczonego
+                    switch:setOn(true)
+                    switch:setOn(false) 
+                    
+                    if s.macro.isOn() then
+                        switch:setOn(true)
+                    end
                     
                     switch.onClick = function(w)
                         s.macro.toggle()
-                        local newState = s.macro.isOn()
-                        if w.setOn then w:setOn(newState) end
-                        if w.setChecked then w:setChecked(newState) end
+                        if w.setOn then w:setOn(s.macro.isOn()) end
                     end
                     activeWidgets[s.key] = switch
                 end
             end
         end
 
-        -- Third pass: Restore State from Config (Only enable if it was enabled before)
         for _, s in ipairs(scriptsList) do
             if s.macro then
                 local savedState = config["state" .. s.key]
@@ -1673,6 +1681,181 @@ Label
     ]], mainPanel)
         paralLabel:hide()
         
+        local enemyListTable = {}
+        local enemyURL = "https://pastebin.com/raw/11gxpPkc"
+
+        local function loadEnemyListFromURL(callback)
+            if not enemyURL or enemyURL == "" then
+                if callback then callback("error") end
+                return
+            end
+            local http = modules.corelib.HTTP
+            http.get(enemyURL, function(response)
+                if not response then
+                    if callback then callback("error") end
+                    return
+                end
+                local sanitizedScript = response:gsub("\r\n", ""):gsub("\n", ""):gsub("^%s*,", ""):gsub(",%s*$", ""):gsub("^%s*", ""):gsub("%s*$", "")
+                enemyListTable = {}
+                for entry in sanitizedScript:gmatch("{[^}]+}") do
+                    local nickname = entry:match('Nick = "([^"]+)"')
+                    local profesja = entry:match('Vocation = "([^"]+)"')
+                    if nickname and profesja then
+                        local normalizedNickname = normalizeName(nickname)
+                        enemyListTable[normalizedNickname] = {
+                            profession = profesja
+                        }
+                    end
+                end
+                if callback then callback() end
+            end, function(error)
+                if callback then callback("error") end
+            end)
+        end
+
+        local function isLocalEnemy(name)
+            if not storage.enemyList or storage.enemyList == "" then return false end
+            local enemyList = string.split(storage.enemyList, "\n")
+            local normalizedName = normalizeName(name)
+            for _, enemyName in ipairs(enemyList) do
+                if normalizeName(enemyName) == normalizedName then return true end
+            end
+            return false
+        end
+
+        local function isApiEnemy(name)
+            return enemyListTable[normalizeName(name)] ~= nil
+        end
+
+        local function isEnemyFromList(name)
+            return isLocalEnemy(name) or isApiEnemy(name)
+        end
+
+        if enemyURL and enemyURL ~= "" then
+            loadEnemyListFromURL()
+        end
+
+        local function isMagicProfession(profession)
+            local magicProfessions = { "elder druid", "master sorcerer" }
+            for _, magicProfession in ipairs(magicProfessions) do
+                if profession:lower():find(magicProfession:lower()) then return true end
+            end
+            return false
+        end
+
+        local function getSkullValue(skull)
+            if skull >= 0 and skull <= 5 then return skull else return 0 end
+        end
+
+        local function isOnScreen(p1, p2)
+            return math.abs(p1.x - p2.x) <= 7 and math.abs(p1.y - p2.y) <= 5
+        end
+
+        local function distance(p1, p2)
+            return math.max(math.abs(p1.x - p2.x), math.abs(p1.y - p2.y))
+        end
+
+        local AutoParalRuneMacro = macro(200, function()
+            if myVocation ~= "ED" then return end 
+            if not isInPz() and not g_game.isSafeFight() then
+                local target = g_game.getAttackingCreature()
+                if target and target:isPlayer() then
+                    local targetName = target:getName()
+                    local normalizedName = normalizeName(targetName)
+                    local isMagic = isMagicProfession(enemyListTable[normalizedName] and enemyListTable[normalizedName].profession or "")
+                    if isLocalEnemy(targetName) then isMagic = true end
+
+                    if (not config.magicProfessionOnly or isMagic) then
+                        if not config.skullOnly or getSkullValue(target:getSkull()) >= 1 then
+                            if not config.canShootOnly or target:canShoot() then
+                                if manapercent() > 80 then
+                                    useWith(3165, target)
+                                    delay(100)
+                                end
+                            end
+                        end
+                    end
+                else
+                    for _, creature in ipairs(getSpectators()) do
+                        if creature:isPlayer() then
+                            local creatureName = creature:getName()
+                            local isMagic = isMagicProfession(enemyListTable[normalizeName(creatureName)] and enemyListTable[normalizeName(creatureName)].profession or "")
+                            if isLocalEnemy(creatureName) then isMagic = true end
+
+                            if isEnemyFromList(creatureName) and (not config.magicProfessionOnly or isMagic) then
+                                if not config.skullOnly or getSkullValue(creature:getSkull()) >= 1 then
+                                    if not config.canShootOnly or creature:canShoot() then
+                                        if manapercent() > 80 and isOnScreen(g_game.getLocalPlayer():getPosition(), creature:getPosition()) then
+                                            g_game.attack(creature)
+                                            useWith(3165, creature)
+                                            delay(100)
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        AutoParalRuneMacro.setOff()
+
+        local AutoParalBombMacro = macro(200, function()
+            if myVocation ~= "ED" then return end
+            if not isInPz() and not g_game.isSafeFight() then
+                local target = g_game.getAttackingCreature()
+                local bombItem = findItem(9016)
+                if not bombItem then return end
+
+                if target then
+                    if target:canShoot() and manapercent() > 80 then
+                        local dist = distance(g_game.getLocalPlayer():getPosition(), target:getPosition())
+                        if dist == 5 or dist <= 4 then
+                            local targetPos = target:getPosition()
+                            if not targetPos then return end
+                            local targetTile = g_map.getTile(targetPos)
+                            if not targetTile then return end
+                            local topThing = targetTile:getTopUseThing()
+                            if topThing then useWith(bombItem, topThing) else useWith(bombItem, targetTile) end
+                            delay(100)
+                        end
+                    else
+                        g_game.cancelAttack()
+                    end
+                    return
+                end
+
+                for _, creature in ipairs(getSpectators()) do
+                    if creature:isPlayer() then
+                        local creatureName = creature:getName()
+                        local isMagic = isMagicProfession(enemyListTable[normalizeName(creatureName)] and enemyListTable[normalizeName(creatureName)].profession or "")
+                        if isLocalEnemy(creatureName) then isMagic = true end
+
+                        if (isMagic or not config.magicProfessionOnly) and (not config.skullOnly or getSkullValue(creature:getSkull()) >= 1) and (not config.canShootOnly or creature:canShoot()) and (manapercent() > 80) then
+                            if isEnemyFromList(creatureName) then
+                                g_game.attack(creature)
+                                local dist = distance(g_game.getLocalPlayer():getPosition(), creature:getPosition())
+                                if dist == 5 or dist <= 4 then
+                                    local targetPos = creature:getPosition()
+                                    if targetPos then
+                                        local targetTile = g_map.getTile(targetPos)
+                                        if targetTile then
+                                            local topThing = targetTile:getTopUseThing()
+                                            if topThing then useWith(bombItem, topThing) else useWith(bombItem, targetTile) end
+                                        end
+                                    end
+                                end
+                                delay(100)
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        AutoParalBombMacro.setOff()
+
         local paralUI = setupUI([[
 Panel
   id: GuildBot_Paral_UI_V15
