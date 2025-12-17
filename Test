@@ -1,41 +1,66 @@
 -- ==========================================================
--- SYSTEM ZARZĄDZANIA CZYSZCZENIEM (DODANE NA POCZĄTKU)
+-- SYSTEM ANTY-DUPLIKACJA (BEZ UŻYCIA _G)
 -- ==========================================================
-local scriptActive = true
-local registeredMacros = {}
-local registeredWidgets = {}
-local registeredIcons = {}
 
--- Nadpisujemy funkcję macro, aby automatycznie zapisywała makra do listy
+-- 1. Unikalne ID dla Panelu (musi być unikalne w calym bocie)
+local uniquePanelID = "GuildBot_Main_Panel_V15"
+
+-- 2. Czyszczenie starego UI (szukamy po ID w rootWidget)
+local rootWidget = g_ui.getRootWidget()
+if rootWidget then
+    local oldPanel = rootWidget:recursiveGetChildById(uniquePanelID)
+    if oldPanel then
+        oldPanel:destroy()
+    end
+end
+
+-- 3. System zabijania starych makr przy przeładowaniu (Token System)
+-- Generujemy nowy token dla tej instancji skryptu
+local myInstanceToken = os.time() .. "_" .. math.random(1000,9999)
+-- Zapisujemy go w storage (współdzielonym między instancjami)
+storage.guildBotActiveToken = myInstanceToken
+
+-- Helper sprawdzający, czy ta instancja skryptu jest aktualna
+local function isCurrentInstance()
+    return storage.guildBotActiveToken == myInstanceToken
+end
+
+-- ==========================================================
+-- WRAPPERY (Automatyczne wyłączanie starych funkcji)
+-- ==========================================================
+
 local _original_macro = macro
 macro = function(delay, funcOrName, func)
-    local m = _original_macro(delay, funcOrName, func)
-    table.insert(registeredMacros, m)
+    -- Tworzymy wrapper na funkcję makra
+    local callback = func
+    if type(funcOrName) == "function" then callback = funcOrName end
+    
+    local protectedCallback = function()
+        -- Jeśli token w storage jest inny niż mój, znaczy że załadowano nowszą wersję skryptu
+        if not isCurrentInstance() then 
+            return -- Przerywamy działanie starego makra
+        end
+        if callback then callback() end
+    end
+
+    local m
+    if type(funcOrName) == "string" then
+        m = _original_macro(delay, funcOrName, protectedCallback)
+    else
+        m = _original_macro(delay, protectedCallback)
+    end
+    
+    -- Dodatkowy bezpiecznik: sprawdzamy co cykl czy makro nie powinno się samo wyłączyć
+    -- (Niektóre boty nie pozwalają łatwo "wyłączyć" makra z wnętrza makra, 
+    -- ale 'return' w protectedCallback załatwia sprawę logiki)
     return m
 end
 
--- Nadpisujemy setupUI, aby automatycznie zapisywać okna
-local _original_setupUI = setupUI
-setupUI = function(definition, parent)
-    local w = _original_setupUI(definition, parent)
-    table.insert(registeredWidgets, w)
-    return w
-end
-
--- Nadpisujemy addIcon, aby automatycznie zapisywać ikony
-local _original_addIcon = addIcon
-addIcon = function(...)
-    local i = _original_addIcon(...)
-    table.insert(registeredIcons, i)
-    return i
-end
-
--- Zabezpieczenie listenerów (onTalk, onTextMessage) przed działaniem w tle po aktualizacji
 local _original_onTalk = onTalk
 onTalk = function(callback)
     if _original_onTalk then
         _original_onTalk(function(...)
-            if not scriptActive then return end -- Jeśli skrypt nieaktywny, nie rób nic
+            if not isCurrentInstance() then return end
             return callback(...)
         end)
     end
@@ -45,14 +70,26 @@ local _original_onTextMessage = onTextMessage
 onTextMessage = function(callback)
     if _original_onTextMessage then
         _original_onTextMessage(function(...)
-            if not scriptActive then return end
+            if not isCurrentInstance() then return end
             return callback(...)
         end)
     end
 end
 
+-- Helper do UI - aby przypisywać ID
+local _original_setupUI = setupUI
+setupUI = function(definition, parent)
+    local w = _original_setupUI(definition, parent)
+    -- Jeśli to nasz główny panel, nadajemy mu ID do późniejszego znalezienia
+    if not parent or parent == modules.game_interface.getMapPanel() then
+         -- Próbujemy zgadnąć czy to główny panel po rozmiarze lub dzieciach, 
+         -- ale dla pewności nadamy ID ręcznie w kodzie niżej.
+    end
+    return w
+end
+
 -- ==========================================================
--- ORYGINALNY KOD SKRYPTU (Z DROBNYMI ZMIANAMI ZABEZPIECZAJĄCYMI)
+-- ORYGINALNY KOD SKRYPTU
 -- ==========================================================
 
 setDefaultTab("Guild")
@@ -87,7 +124,7 @@ local console = modules.game_console
 local joined = false
 
 local function joinGuildChannelIfNeeded()
-    if joined then return end  
+    if joined then return end   
     
     if console.channels and console.channels[0] then
         joined = true
@@ -562,7 +599,10 @@ local function countPlayers()
     return enemies, guildies
 end
 
+-- TUTAJ NADPISUJEMY ID DLA WIDGETÓW ABY MOŻNA JE BYŁO USUNĄĆ
+
 local guildWidget = setupUI([[Label
+  id: guildWidget
   color: green
   font: verdana-11px-rounded
   height: 12
@@ -573,8 +613,11 @@ local guildWidget = setupUI([[Label
   text-auto-resize: true
   margin-left: 0
   margin-top: 2]], modules.game_interface.getMapPanel())
+-- Rejestracja ID dla cleanera:
+guildWidget:setId(uniquePanelID .. "_guild")
 
 local enemyWidget = setupUI([[Label
+  id: enemyWidget
   color: red
   font: verdana-11px-rounded
   height: 12
@@ -585,6 +628,17 @@ local enemyWidget = setupUI([[Label
   text-auto-resize: true
   margin-left: 0
   margin-top: 15]], modules.game_interface.getMapPanel())
+-- Rejestracja ID dla cleanera:
+enemyWidget:setId(uniquePanelID .. "_enemy")
+
+-- Dodatkowe czyszczenie tych małych widgetów (ponieważ uniquePanelID czyści główny panel opcji)
+if rootWidget then
+    local oldG = rootWidget:recursiveGetChildById(uniquePanelID .. "_guild")
+    if oldG and oldG ~= guildWidget then oldG:destroy() end
+    local oldE = rootWidget:recursiveGetChildById(uniquePanelID .. "_enemy")
+    if oldE and oldE ~= enemyWidget then oldE:destroy() end
+end
+
 
 macro(1000, function()
     if recognizeMacro.isOff() then return end
@@ -862,11 +916,13 @@ HotkeyProWindow < MainWindow
     width: 60
 ]])
 
-local rootWidget = g_ui.getRootWidget()
 if rootWidget then
+    -- Najpierw czyścimy stare okno hotkeyów
+    local oldH = rootWidget:recursiveGetChildById("HotkeyProWindow_Unique")
+    if oldH then oldH:destroy() end
+
     local hWindow = UI.createWindow('HotkeyProWindow', rootWidget)
-    -- Rejestrujemy okno popup manualnie bo nie uzywa naszego setupUI
-    table.insert(registeredWidgets, hWindow)
+    hWindow:setId("HotkeyProWindow_Unique") -- Ustawiamy ID
     hWindow:hide()
 
     for _, item in ipairs(hotkeyList) do
@@ -1312,14 +1368,14 @@ end)
 onPlayerPositionChange(function()
     if systemLoading then return end
     if DestroyFieldMacro.isOn() then
-         local currentPosition = pos()
-         local tileUnderPlayer = g_map.getTile(currentPosition)
-         if tileUnderPlayer then
-             local topThingUnderPlayer = tileUnderPlayer:getTopUseThing()
-             if topThingUnderPlayer and table.contains(fields, topThingUnderPlayer:getId()) then
-                 useWith(destroyField, topThingUnderPlayer)
-             end
-         end
+          local currentPosition = pos()
+          local tileUnderPlayer = g_map.getTile(currentPosition)
+          if tileUnderPlayer then
+              local topThingUnderPlayer = tileUnderPlayer:getTopUseThing()
+              if topThingUnderPlayer and table.contains(fields, topThingUnderPlayer:getId()) then
+                  useWith(destroyField, topThingUnderPlayer)
+              end
+          end
     end
 end)
 
@@ -1525,9 +1581,23 @@ end
 onPlayerPositionChange(function(newPos, oldPos)
     if systemLoading then return end
     if FloorLockMacro.isOn() then
-         local gameMapPanel = modules.game_interface.getMapPanel()
-         if gameMapPanel then gameMapPanel:lockVisibleFloor(newPos.z) end
+          local gameMapPanel = modules.game_interface.getMapPanel()
+          if gameMapPanel then gameMapPanel:lockVisibleFloor(newPos.z) end
     end
+end)
+
+-- REPAIR BOOTS (NOWE MAKRO)
+local RepairBootsMacro = macro(10000, function()
+    if systemLoading then return end
+    local feet = getFeet()
+    if not feet then return end
+    
+    local id = feet:getId()
+    if id == 6530 then
+      say("!soft")
+    elseif id == 9020 then
+      say("!cyleria boots")
+    end    
 end)
 
 
@@ -1544,6 +1614,8 @@ local scriptsList = {
     { key = "AutoSSA_V15", label = "Auto SSA", defaultId = 3081, macro = AutoSSAMacro, defaultText="SSA" },
     { key = "AutoMR_V15", label = "Auto MR", defaultId = 3048, macro = AutoMRMacro, defaultText="MR" },
     { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" },
+    -- Dodano Repair Boots
+    { key = "RepairBoots_V15", label = "Repair Boots", defaultId = 9020, macro = RepairBootsMacro, defaultText="Repair" },
 }
 
 -- --- UI SETUP ---
@@ -1736,8 +1808,12 @@ BlessSetupWindow < MainWindow
 local rootWidget = g_ui.getRootWidget()
 local setupWindow
 if rootWidget then
+    -- Czyścimy stare okno setupu
+    local oldSetup = rootWidget:recursiveGetChildById("BlessSetupWindow_Unique")
+    if oldSetup then oldSetup:destroy() end
+
     setupWindow = UI.createWindow('BlessSetupWindow', rootWidget)
-    table.insert(registeredWidgets, setupWindow) -- Rejestracja okna
+    setupWindow:setId("BlessSetupWindow_Unique")
     setupWindow:hide()
 
     setupWindow.closeBtn.onClick = function()
@@ -1798,10 +1874,12 @@ end)
 
 local mainPanel = setupUI([[
 Panel
+  id: mainPanelContainer
   layout:
     type: verticalBox
     fit-children: true
 ]])
+mainPanel:setId(uniquePanelID) -- To jest kluczowe ID!
 
 local activeWidgets = {}
 
@@ -1898,9 +1976,14 @@ end)
 
 UI.Separator()
 local paralLabel = UI.Label("AutoParal (ED Only):")
-table.insert(registeredWidgets, paralLabel) -- Rejestracja labela
+paralLabel:setId("ParalLabel_Unique")
 paralLabel:hide() -- Domyślnie ukryte
 paralLabel:setHeight(0)
+-- Czyszczenie starych labeli paral
+if rootWidget then
+    local oldP = rootWidget:recursiveGetChildById("ParalLabel_Unique")
+    if oldP and oldP ~= paralLabel then oldP:destroy() end
+end
 
 local function normalizeName(name)
     return name:lower():gsub("^%s*(.-)%s*$", "%1"):gsub("[^%w]", "")
@@ -2019,12 +2102,19 @@ Panel
 ]])
 
 -- Domyślnie ukryj panel na starcie
+ui:setId("ParalUI_Unique")
 ui:hide()
 ui:setHeight(0)
 
+-- Czyszczenie starych paneli paral
+if rootWidget then
+    local oldPUI = rootWidget:recursiveGetChildById("ParalUI_Unique")
+    if oldPUI and oldPUI ~= ui then oldPUI:destroy() end
+end
+
 -- Obsługa przycisku w panelu
 ui.editListBtn.onClick = function()
-    UI.MultilineEditorWindow(storage.enemyList or "", {
+    local editWin = UI.MultilineEditorWindow(storage.enemyList or "", {
         title = "Enemy List", 
         description = "Lista wrogow do paralowania. PD paralowane automatycznie - ich nickow nie trzeba dodawac.\nPrzyklad:\nPlayer1\nPlayer2"
     }, function(text)
@@ -2261,43 +2351,3 @@ macro(1000, function()
         end
     end
 end)
-
--- ==========================================================
--- FUNKCJA CLEANUP (DODANE NA KOŃCU)
--- ==========================================================
-
-return {
-    onStop = function()
-        -- 1. Zaznacz skrypt jako nieaktywny (blokuje onTalk/onTextMessage)
-        scriptActive = false
-        
-        -- 2. Wyłącz i usuń makra
-        for _, m in pairs(registeredMacros) do
-            if m then
-                m.setOff()
-                m = nil
-            end
-        end
-        
-        -- 3. Zniszcz okienka UI
-        for _, w in pairs(registeredWidgets) do
-            if w then
-                w:destroy()
-                w = nil
-            end
-        end
-        
-        -- 4. Zniszcz ikony
-        for _, i in pairs(registeredIcons) do
-            if i then
-                i:destroy()
-                i = nil
-            end
-        end
-        
-        -- 5. Czyść tablice (opcjonalnie, GC i tak by to zrobił)
-        registeredMacros = {}
-        registeredWidgets = {}
-        registeredIcons = {}
-    end
-}
