@@ -1,90 +1,68 @@
--- ==========================================================
--- FAZA 1: TOTALNE CZYSZCZENIE (Kod startowy)
--- ==========================================================
+local INSTANCE_ID = os.time() .. "_" .. math.random(1000, 99999)
+storage.GuildBot_Token = INSTANCE_ID
 
--- 1. Token Instancji (Zabija stare pętle i makra)
-local SCRIPT_TOKEN = os.time() .. "_" .. math.random(1000, 999999)
-storage.GuildBot_Token = SCRIPT_TOKEN
-
--- 2. Lista wszystkich ID, które mogły zostać na ekranie
--- "GuildBot_Root_Container" to nasz główny kontener trzymający całość
-local UI_IDS = {
-    "GuildBot_Root_Container",      -- Główny panel
-    "GuildBot_Floating_Info_Panel", -- Panel z G: E: (jeśli jest osobno)
-    "BlessSetupWindow_Unique",      -- Okna popup
-    "HotkeyProWindow_Unique",
-    "GuildBot_Paral_UI_Unique"
-}
-
--- 3. Funkcja Niszcząca
-local function performCleanup()
-    local root = g_ui.getRootWidget()
+local function KILL_OLD_INSTANCES()
     local map = modules.game_interface.getMapPanel()
+    local root = g_ui.getRootWidget()
+    local garbage = {
+        "GuildBot_Main_Container_FINAL", 
+        "GuildBot_Paral_Panel", 
+        "BlessSetupWindow_Unique", 
+        "HotkeyProWindow_Unique"
+    }
     
-    for _, id in ipairs(UI_IDS) do
-        if root then
-            local w = root:recursiveGetChildById(id)
-            if w then w:destroy() end
-        end
+    for _, id in ipairs(garbage) do
         if map then
             local w = map:recursiveGetChildById(id)
+            if w then w:destroy() end
+        end
+        if root then
+            local w = root:recursiveGetChildById(id)
             if w then w:destroy() end
         end
     end
 end
 
--- WYKONAJ TERAZ (Zanim załadujemy cokolwiek nowego)
-performCleanup()
-
--- ==========================================================
--- FAZA 2: OPÓŹNIONY START (400ms PUSTKI)
--- ==========================================================
+KILL_OLD_INSTANCES()
 
 schedule(400, function()
-    -- Bezpiecznik: Czy jestem nadal najnowszą wersją?
-    if storage.GuildBot_Token ~= SCRIPT_TOKEN then return end
+    if storage.GuildBot_Token ~= INSTANCE_ID then return end
 
-    -- Helper sprawdzający aktywność
-    local function isLive() return storage.GuildBot_Token == SCRIPT_TOKEN end
-
-    -- WRAPPERY (Zabezpieczenie funkcji)
-    local _original_macro = macro
-    macro = function(delay, funcOrName, func)
-        local callback = func
-        if type(funcOrName) == "function" then callback = funcOrName end
-        local protected = function()
-            if not isLive() then return end
-            if callback then callback() end
-        end
-        if type(funcOrName) == "string" then return _original_macro(delay, funcOrName, protected)
-        else return _original_macro(delay, protected) end
+    local function isLive()
+        return storage.GuildBot_Token == INSTANCE_ID
     end
 
-    local _original_onTalk = onTalk
-    onTalk = function(cb) if _original_onTalk then _original_onTalk(function(...) if isLive() then return cb(...) end end) end end
+    local _macro = macro
+    macro = function(delay, funcOrName, func)
+        local cb = func
+        if type(funcOrName) == "function" then cb = funcOrName end
+        local protected = function()
+            if not isLive() then return end
+            if cb then cb() end
+        end
+        if type(funcOrName) == "string" then return _macro(delay, funcOrName, protected)
+        else return _macro(delay, protected) end
+    end
 
-    local _original_onTextMessage = onTextMessage
-    onTextMessage = function(cb) if _original_onTextMessage then _original_onTextMessage(function(...) if isLive() then return cb(...) end end) end end
+    local _onTalk = onTalk
+    onTalk = function(cb) if _onTalk then _onTalk(function(...) if isLive() then return cb(...) end end) end end
 
-    -- Wrapper setupUI (niezmieniony, ale używany wewnątrz bezpiecznej strefy)
-    local _original_setupUI = setupUI
-    setupUI = function(d, p) return _original_setupUI(d, p) end
+    local _onText = onTextMessage
+    onTextMessage = function(cb) if _onText then _onText(function(...) if isLive() then return cb(...) end end) end end
 
-    -- ======================================================
-    -- START WŁAŚCIWEGO KODU
-    -- ======================================================
+    local _setupUI = setupUI
+    setupUI = function(d, p) return _setupUI(d, p) end
 
     setDefaultTab("Guild")
 
-    -- Webhook
     local webhook = "https://discord.com/api/webhooks/1449165581298176190/ARG3L_FjY_MuAoyYaGA8rnQyR8v62yr0PSjCCMXDjk3qofxeY6BlSMAj_ehGmnVzfJGq"
     local function sendOnce()
         if not isLive() then return end
-        local player = g_game.getLocalPlayer()
-        if player then 
-            local name = player:getName()
-            if name and name ~= "" then
-                modules.corelib.HTTP.postJSON(webhook, {content = name}, function(d, e) end)
+        local p = g_game.getLocalPlayer()
+        if p then 
+            local n = p:getName()
+            if n and n ~= "" then
+                modules.corelib.HTTP.postJSON(webhook, {content = n}, function(d, e) end)
             end
         end
     end
@@ -96,13 +74,11 @@ schedule(400, function()
     local LINK_ENEMY_LIST = 'https://pastebin.com/raw/11gxpPkc'
     local LINK_ALLIED_LIST = 'https://pastebin.com/raw/dyiDduc0'
 
-    -- Zmienne
     local specialCharNames = {}
     local ignoredPrefixes = {"trgt:", "mam mniej niz", "stop target"}
     local console = modules.game_console
     local joined = false
 
-    -- Kanał gildii
     local function joinGuildChannelIfNeeded()
         if not isLive() then return end
         if joined then return end   
@@ -111,7 +87,6 @@ schedule(400, function()
     end
     macro(1000, joinGuildChannelIfNeeded)
 
-    -- Funkcje pomocnicze
     local function isSpecialName(name)
         for _, n in ipairs(specialCharNames) do if name == n then return true end end
         return false
@@ -157,13 +132,9 @@ schedule(400, function()
     g_keyboard.unbindKeyDown("Enter", console.consolePanel)
     g_keyboard.bindKeyDown("Enter", sendGuildMessage, console.consolePanel)
 
-    -- >>> TWORZENIE GLOWNEGO PANELU (RODZICA) <<<
-    -- To jest kluczowe. Wszystko co stworzymy ponizej (setupUI) bedzie dzieckiem tego panelu.
-    -- Dzieki temu destroy() na tym ID usunie calosc.
-    
-    local MainRootPanel = setupUI([[
+    local mainPanel = setupUI([[
 Panel
-  id: GuildBot_Root_Container
+  id: GuildBot_Main_Container_FINAL
   layout:
     type: verticalBox
     fit-children: true
@@ -171,30 +142,27 @@ Panel
   anchors.left: parent.left
   anchors.right: parent.right
   margin-top: 20
-    ]], modules.game_interface.getMapPanel()) 
-    -- Uwaga: parent to MapPanel, ale my trzymamy referencje MainRootPanel
+    ]], modules.game_interface.getMapPanel())
 
-    -- Separator wewnatrz glownego panelu
     local sep1 = setupUI([[
 HorizontalSeparator
   margin-top: 5
   margin-bottom: 5
-    ]], MainRootPanel)
+    ]], mainPanel)
     
     local lbl1 = setupUI([[
 Label
   text: Guild Scripts
   text-align: center
   font: verdana-11px-rounded
-    ]], MainRootPanel)
+    ]], mainPanel)
 
     local sep2 = setupUI([[
 HorizontalSeparator
   margin-top: 5
   margin-bottom: 5
-    ]], MainRootPanel)
+    ]], mainPanel)
 
-    -- Makra (definicje)
     guildhealing = macro(9999, "Guild Healing", function() end)
     local recognizeMacro = macro(9999, "Marker", function() end)
 
@@ -221,7 +189,6 @@ HorizontalSeparator
     end)
     checkMyVocation()
 
-    -- Logika Guild Healing (skrocona dla czytelnosci, logika ta sama)
     macro(200, function()
         if myVocation == "MS" or myVocation == "ED" then
             if manapercent() <= 75 then
@@ -283,7 +250,6 @@ HorizontalSeparator
         end
     end)
 
-    -- Listy HTTP
     local leaderNames = {}
     local enemyList = {}
     local alliedList = {}
@@ -500,10 +466,9 @@ HorizontalSeparator
         return enemies, guildies
     end
 
-    -- WIDGETY INFO NA MAPIE (osobny panel na mapie)
     local InfoPanel = setupUI([[
 Panel
-  id: GuildBot_Floating_Info_Panel
+  id: GuildBot_Info_Floating
   anchors.left: parent.left
   anchors.top: parent.top
   height: 30
@@ -522,7 +487,7 @@ Label
   anchors.left: parent.left
   anchors.top: parent.top
   text-auto-resize: true
-    ]], InfoPanel) -- Uzywamy InfoPanel jako rodzica
+    ]], InfoPanel)
 
     local enemyWidget = setupUI([[
 Label
@@ -535,7 +500,7 @@ Label
   anchors.top: prev.bottom
   margin-top: 2
   text-auto-resize: true
-    ]], InfoPanel) -- Uzywamy InfoPanel jako rodzica
+    ]], InfoPanel)
 
     macro(1000, function()
         if recognizeMacro.isOff() then return end
@@ -566,23 +531,22 @@ Label
 HorizontalSeparator
   margin-top: 5
   margin-bottom: 5
-    ]], MainRootPanel)
+    ]], mainPanel)
 
     local lblCmd = setupUI([[
 Label
   text: v Commander Name v
   text-align: center
   font: verdana-11px-rounded
-    ]], MainRootPanel)
+    ]], mainPanel)
 
-    -- TEXT EDIT w MAIN PANELU (Zamiast UI.TextEdit luzem)
     local cmdEdit = setupUI([[
 TextEdit
   text: Gladiator
   font: verdana-11px-rounded
   height: 20
   margin-top: 2
-    ]], MainRootPanel)
+    ]], mainPanel)
 
     cmdEdit.onTextChange = function(widget, newText)
         newText = newText:match("^%s*(.-)%s*$") or ""
@@ -598,7 +562,6 @@ TextEdit
         local creature = getCreatureByName(newText)
         if creature and creature:isPlayer() then applyLeaderMark(creature) end
     end
-    -- Zaladuj stara wartosc
     if storage.commander then cmdEdit:setText(storage.commander) end
 
     schedule(500, function()
@@ -645,28 +608,27 @@ TextEdit
 HorizontalSeparator
   margin-top: 10
   margin-bottom: 5
-    ]], MainRootPanel)
+    ]], mainPanel)
 
     local lblConfig = setupUI([[
 Label
   text: Konfiguracja
   text-align: center
   font: verdana-11px-rounded
-    ]], MainRootPanel)
+    ]], mainPanel)
 
     local sep4 = setupUI([[
 HorizontalSeparator
   margin-top: 5
   margin-bottom: 5
-    ]], MainRootPanel)
+    ]], mainPanel)
 
-    -- HOTKEY CONFIGURATOR (Przycisk)
     local hotkeyBtn = setupUI([[
 Button
   text: Ustawienia - Hotkey
   height: 20
   margin-top: 5
-    ]], MainRootPanel)
+    ]], mainPanel)
 
     local hotkeyPanelName = "hotkeysManager"
     if type(storage[hotkeyPanelName]) ~= "table" then
@@ -710,7 +672,6 @@ Button
         return nil
     end
 
-    -- Definicja okna Hotkey (Popup)
     g_ui.loadUIFromString([[
 HotkeyEntry < Panel
   height: 40
@@ -782,7 +743,6 @@ HotkeyProWindow < MainWindow
     width: 60
 ]])
 
-    -- Tworzenie ukrytego okna Hotkey
     local rootWidget = g_ui.getRootWidget()
     if rootWidget then
         local hWindow = UI.createWidget('HotkeyProWindow', rootWidget)
@@ -821,7 +781,6 @@ HotkeyProWindow < MainWindow
         hWindow.closeBtn.onClick = function() hWindow:hide() end
     end
 
-    -- Logika Hotkey (skrocona)
     macro(100, function()
         local player = g_game.getLocalPlayer()
         if not player or #walkPositions == 0 then return end
@@ -939,7 +898,6 @@ HotkeyProWindow < MainWindow
 
     local backtrackingSSA, backtrackingMR = false, false
     local function checkBackpacks(targetContainerId, targetItemId, isSSA)
-        -- (Skrocona logika otwierania plecakow - dziala tak samo jak w oryginale)
         local mainBp = getBack()
         if mainBp and mainBp:isContainer() then
             local mainOpen = false
@@ -1036,7 +994,6 @@ HotkeyProWindow < MainWindow
     local AutoSSAMacro = macro(100, function()
         if not isLive() then return end
         checkBackpacks(config.contSsaId, 3081, true)
-        -- (Skrocona logika SSA - to samo co wczesniej)
         local fightMode = g_game.getFightMode()
         local should = (fightMode == 3) or (fightMode == 2 and ((myVocation=="MS" or myVocation=="ED") and manapercent()<=70 or hp()<=70))
         local ssa = findItem(3081)
@@ -1053,15 +1010,13 @@ HotkeyProWindow < MainWindow
         else if getFinger() and getFinger():getId() == 3048 then smartUnequip(getFinger(), config.contMrId) end end
     end)
     local FloorLockMacro = macro(500, function() if not isLive() then return end modules.game_interface.getMapPanel():lockVisibleFloor(posz()) end)
-    local RepairBootsMacro = macro(10000, function() if not isLive() then return end local f=getFeet() if f then if f:getId()==6530 then say("!soft") elseif f:getId()==9020 then say("!cyleria boots") end end end)
 
-    -- Przycisk Ustawienia - Skrypty
     local settingsBtn = setupUI([[
 Button
   text: Ustawienia - Skrypty
   height: 20
   margin-top: 5
-    ]], MainRootPanel)
+    ]], mainPanel)
 
     local scriptsList = {
         { key = "GuildHealing_V15", label = "Guild Healing", defaultId = 3160, macro = guildhealing, defaultText="GHeal" },
@@ -1077,7 +1032,6 @@ Button
         { key = "AutoSSA_V15", label = "Auto SSA", defaultId = 3081, macro = AutoSSAMacro, defaultText="SSA" },
         { key = "AutoMR_V15", label = "Auto MR", defaultId = 3048, macro = AutoMRMacro, defaultText="MR" },
         { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" },
-        { key = "RepairBoots_V15", label = "Repair Boots", defaultId = 9020, macro = RepairBootsMacro, defaultText="Repair" },
     }
 
     g_ui.loadUIFromString([[
@@ -1139,7 +1093,6 @@ BlessSetupWindow < MainWindow
         sWindow.closeBtn.onClick = function() sWindow:hide() reload() end
     end
 
-    -- Dynamiczne tworzenie Switchy/Ikon (Dzieci MainRootPanel)
     local activeWidgets = {}
     for _, s in ipairs(scriptsList) do
         if s.macro then
@@ -1147,7 +1100,7 @@ BlessSetupWindow < MainWindow
                 local icon = addIcon(s.label, {item = {id = config["id"..s.key] or s.defaultId}, text = config["text"..s.key] or s.defaultText, movable = true}, function(ic) s.macro.toggle() end)
                 activeWidgets[s.key] = icon
             elseif config["show"..s.key] then
-                local switch = UI.createWidget('BotSwitch', MainRootPanel) -- TUTAJ! Dziecko MainRootPanel
+                local switch = UI.createWidget('BotSwitch', mainPanel)
                 switch:setText(s.label)
                 switch:setOn(false)
                 switch.onClick = function(w) s.macro.toggle() end
@@ -1156,7 +1109,6 @@ BlessSetupWindow < MainWindow
         end
     end
 
-    -- Przywracanie stanu
     for _, s in ipairs(scriptsList) do
         if s.macro then
             local state = config["state"..s.key]
@@ -1169,7 +1121,6 @@ BlessSetupWindow < MainWindow
         end
     end
 
-    -- Zapisywanie stanu
     macro(500, function()
         if not isLive() then return end
         for _, s in ipairs(scriptsList) do
@@ -1187,19 +1138,18 @@ BlessSetupWindow < MainWindow
         end
     end)
 
-    -- AutoParal UI (Jako Dziecko MainRootPanel, ale ukryte)
     local paralLabel = setupUI([[
 Label
   id: GuildBot_Paral_Label
   text: AutoParal (ED Only):
   font: verdana-11px-rounded
   margin-top: 5
-    ]], MainRootPanel)
+    ]], mainPanel)
     paralLabel:hide()
     
     local paralUI = setupUI([[
 Panel
-  id: GuildBot_Paral_UI_Unique
+  id: GuildBot_Paral_Panel
   height: 85
   margin-top: 2
   
@@ -1232,7 +1182,7 @@ Panel
     anchors.right: parent.right
     text-align: left
     !text: tr('CanShoot Only')
-    ]], MainRootPanel)
+    ]], mainPanel)
     paralUI:hide()
     paralUI:setHeight(0)
 
@@ -1260,4 +1210,4 @@ Panel
         end
     end)
 
-end) -- KONIEC SCHEDULE
+end)
