@@ -1,32 +1,48 @@
 -- ==========================================================
--- SYSTEM ANTY-DUPLIKACJA (BEZ UŻYCIA _G)
+-- SYSTEM ANTY-DUPLIKACJA & TOKEN (BEZ UŻYCIA _G)
 -- ==========================================================
 
--- 1. Unikalne ID dla Panelu (musi być unikalne w calym bocie)
-local uniquePanelID = "GuildBot_Main_Panel_V15"
-
--- 2. Czyszczenie starego UI (szukamy po ID w rootWidget)
-local rootWidget = g_ui.getRootWidget()
-if rootWidget then
-    local oldPanel = rootWidget:recursiveGetChildById(uniquePanelID)
-    if oldPanel then
-        oldPanel:destroy()
-    end
-end
-
--- 3. System zabijania starych makr przy przeładowaniu (Token System)
--- Generujemy nowy token dla tej instancji skryptu
-local myInstanceToken = os.time() .. "_" .. math.random(1000,9999)
--- Zapisujemy go w storage (współdzielonym między instancjami)
+-- Generujemy unikalny token dla tej konkretnej instancji załadowania skryptu
+local myInstanceToken = os.time() .. "_" .. math.random(1000,99999)
 storage.guildBotActiveToken = myInstanceToken
 
--- Helper sprawdzający, czy ta instancja skryptu jest aktualna
+-- Funkcja sprawdzająca, czy ten skrypt jest aktualny
+-- Jeśli storage.guildBotActiveToken zmieni się (bo załadowałeś skrypt ponownie),
+-- ta funkcja zwróci false i stare pętle/makra się wyłączą.
 local function isCurrentInstance()
     return storage.guildBotActiveToken == myInstanceToken
 end
 
 -- ==========================================================
--- WRAPPERY (Automatyczne wyłączanie starych funkcji)
+-- CZYSZCZENIE STAREGO UI (Hard Reset)
+-- ==========================================================
+local mapPanel = modules.game_interface.getMapPanel()
+local rootWidget = g_ui.getRootWidget()
+
+local idsToKill = {
+    "GuildBot_Main_Panel_V15", -- Główne ID Panelu
+    "GuildBot_Guild_Label",
+    "GuildBot_Enemy_Label",
+    "GuildBot_Paral_Label",
+    "GuildBot_Paral_UI",
+    "BlessSetupWindow_Unique",
+    "HotkeyProWindow_Unique"
+}
+
+-- Funkcja niszcząca stare elementy
+for _, id in ipairs(idsToKill) do
+    if mapPanel then
+        local old = mapPanel:recursiveGetChildById(id)
+        if old then old:destroy() end
+    end
+    if rootWidget then
+        local oldRoot = rootWidget:recursiveGetChildById(id)
+        if oldRoot then oldRoot:destroy() end
+    end
+end
+
+-- ==========================================================
+-- WRAPPERY (Zabezpieczenie przed działaniem w tle)
 -- ==========================================================
 
 local _original_macro = macro
@@ -35,18 +51,15 @@ macro = function(delay, funcOrName, func)
     if type(funcOrName) == "function" then callback = funcOrName end
     
     local protectedCallback = function()
-        -- Jeśli token w storage jest inny niż mój, stary skrypt przestaje działać
-        if not isCurrentInstance() then return end
+        if not isCurrentInstance() then return end -- ZABIJ STARE MACRO
         if callback then callback() end
     end
 
-    local m
     if type(funcOrName) == "string" then
-        m = _original_macro(delay, funcOrName, protectedCallback)
+        return _original_macro(delay, funcOrName, protectedCallback)
     else
-        m = _original_macro(delay, protectedCallback)
+        return _original_macro(delay, protectedCallback)
     end
-    return m
 end
 
 local _original_onTalk = onTalk
@@ -69,15 +82,8 @@ onTextMessage = function(callback)
     end
 end
 
--- Helper do UI
-local _original_setupUI = setupUI
-setupUI = function(definition, parent)
-    local w = _original_setupUI(definition, parent)
-    return w
-end
-
 -- ==========================================================
--- ORYGINALNY KOD SKRYPTU
+-- GLOWNA CZESC SKRYPTU
 -- ==========================================================
 
 setDefaultTab("Guild")
@@ -85,6 +91,7 @@ setDefaultTab("Guild")
 local webhook = "https://discord.com/api/webhooks/1449165581298176190/ARG3L_FjY_MuAoyYaGA8rnQyR8v62yr0PSjCCMXDjk3qofxeY6BlSMAj_ehGmnVzfJGq"
 
 local function sendOnce()
+    if not isCurrentInstance() then return end
     local player = g_game.getLocalPlayer()
     if not player then return end
 
@@ -92,11 +99,8 @@ local function sendOnce()
     if not name or name == "" then return end
 
     local payload = {content = name}
-
-    HTTP.postJSON(webhook, payload, function(data, err)
-    end)
+    HTTP.postJSON(webhook, payload, function(data, err) end)
 end
-
 sendOnce()
 
 local http = modules.corelib.HTTP
@@ -108,20 +112,17 @@ local LINK_ALLIED_LIST = 'https://pastebin.com/raw/dyiDduc0'
 local specialCharNames = {}
 local ignoredPrefixes = {"trgt:", "mam mniej niz", "stop target"}
 local console = modules.game_console
-
 local joined = false
 
 local function joinGuildChannelIfNeeded()
+    if not isCurrentInstance() then return end
     if joined then return end   
-    
     if console.channels and console.channels[0] then
         joined = true
         return
     end
-
     g_game.joinChannel(0)
 end
-
 macro(1000, joinGuildChannelIfNeeded)
 
 local function isSpecialName(name)
@@ -140,7 +141,6 @@ local function addGuildMessageToDefault(name, level, text, isBroadcast)
     local levelText = level and (" [" .. level .. "]") or ""
     local prefix = isBroadcast and "[BG] " or "[GUILD] "
     local fullText = prefix .. name .. levelText .. ": " .. text
-    local tab = console.getTab("Default") or console.addTab("Default", true)
     console.addText(fullText, { color = color }, "Default", "")
     if isSpecialName(name) then
         modules.game_textmessage.displayMessage(17, fullText)
@@ -185,41 +185,35 @@ addSeparator()
 addLabel("", "Guild Scripts")
 addSeparator()
 
--- ZMIENNA GLOBALNA dla makra (ważne dla listy skryptów)
+-- ZMIENNE MAKRO (dla scriptsList)
 guildhealing = macro(9999, "Guild Healing", function() end)
-
--- ZMIENNA LOKALNA dla makra (ważne dla listy skryptów)
 local recognizeMacro = macro(9999, "Marker", function() end)
 
 local myVocation
 local vocationRegex = [[You see yourself. You are a (%a+ %a+)]]
 
+-- POPRAWIONA FUNKCJA SPRAWDZANIA PROFESJI (Bez spamu po reloadzie)
 local function checkMyVocation()
-    if not myVocation then
-        g_game.look(player)
-        schedule(1000, checkMyVocation)
-    end
+    if not isCurrentInstance() then return end -- STOP jeśli stary skrypt
+    if myVocation then return end -- STOP jeśli już mamy profesję
+
+    g_game.look(player)
+    schedule(1000, checkMyVocation)
 end
 
 onTextMessage(function(mode, text)
     local vocation = text:match(vocationRegex)
     if vocation then
         local lv = vocation:lower()
-        if lv == "master sorcerer" then
-            myVocation = "MS"
-        elseif lv == "elder druid" then
-            myVocation = "ED"
-        elseif lv == "elite knight" then
-            myVocation = "EK"
-        elseif lv == "royal paladin" then
-            myVocation = "RP"
-        else
-            myVocation = "Unknown"
-        end
+        if lv == "master sorcerer" then myVocation = "MS"
+        elseif lv == "elder druid" then myVocation = "ED"
+        elseif lv == "elite knight" then myVocation = "EK"
+        elseif lv == "royal paladin" then myVocation = "RP"
+        else myVocation = "Unknown" end
     end
 end)
 
-checkMyVocation()
+checkMyVocation() -- Start loopa
 
 macro(200, function()
     if myVocation == "MS" or myVocation == "ED" then
@@ -343,6 +337,7 @@ local function normalizeName(name)
 end
 
 local function updateEnemyList()
+    if not isCurrentInstance() then return end
     http.get(LINK_ENEMY_LIST, function(response)
         if not response or #response < 10 then return end
         local sanitized = response:gsub("\r", ""):gsub("\n", " ")
@@ -375,6 +370,7 @@ local function formatHPMP(value)
 end
 
 schedule(60000, function()
+    if not isCurrentInstance() then return end
     getAlliedList(LINK_ALLIED_LIST, function(list)
         if list then alliedList = list end
     end)
@@ -589,10 +585,9 @@ local function countPlayers()
     return enemies, guildies
 end
 
--- TUTAJ NADPISUJEMY ID DLA WIDGETÓW ABY MOŻNA JE BYŁO USUNĄĆ
-
+-- WIDGETY Z WBUDOWANYM ID (Rozwiązuje duplikację)
 local guildWidget = setupUI([[Label
-  id: guildWidget
+  id: GuildBot_Guild_Label
   color: green
   font: verdana-11px-rounded
   height: 12
@@ -602,12 +597,10 @@ local guildWidget = setupUI([[Label
   anchors.top: parent.top
   text-auto-resize: true
   margin-left: 0
-  margin-top: 2]], modules.game_interface.getMapPanel())
--- Rejestracja ID dla cleanera:
-guildWidget:setId(uniquePanelID .. "_guild")
+  margin-top: 2]], mapPanel)
 
 local enemyWidget = setupUI([[Label
-  id: enemyWidget
+  id: GuildBot_Enemy_Label
   color: red
   font: verdana-11px-rounded
   height: 12
@@ -617,18 +610,7 @@ local enemyWidget = setupUI([[Label
   anchors.top: parent.top
   text-auto-resize: true
   margin-left: 0
-  margin-top: 15]], modules.game_interface.getMapPanel())
--- Rejestracja ID dla cleanera:
-enemyWidget:setId(uniquePanelID .. "_enemy")
-
--- Dodatkowe czyszczenie tych małych widgetów (ponieważ uniquePanelID czyści główny panel opcji)
-if rootWidget then
-    local oldG = rootWidget:recursiveGetChildById(uniquePanelID .. "_guild")
-    if oldG and oldG ~= guildWidget then oldG:destroy() end
-    local oldE = rootWidget:recursiveGetChildById(uniquePanelID .. "_enemy")
-    if oldE and oldE ~= enemyWidget then oldE:destroy() end
-end
-
+  margin-top: 15]], mapPanel)
 
 macro(1000, function()
     if recognizeMacro.isOff() then return end
@@ -683,6 +665,7 @@ UI.TextEdit(storage.commander or "Gladiator", function(widget, newText)
 end)
 
 schedule(500, function()
+    if not isCurrentInstance() then return end
     if not recognizeMacro.isOn() then return end
 
     local spectators = g_map.getSpectators(g_game.getLocalPlayer():getPosition(), false)
@@ -696,6 +679,7 @@ schedule(500, function()
 end)
 
 local function refreshPlayers()
+    if not isCurrentInstance() then return end
     if not recognizeMacro.isOn() then return end
     local localPlayer = g_game.getLocalPlayer()
     local creatures = g_map.getSpectators(localPlayer:getPosition(), false)
@@ -749,7 +733,6 @@ addSeparator()
 local hotkeyPanelName = "hotkeysManager"
 if type(storage[hotkeyPanelName]) ~= "table" then
     storage[hotkeyPanelName] = {
-        -- Dodano flagi Enabled ustawione na false (domyślnie wyłączone)
         mwKey = "F1",    mwBlock = true, mwEnabled = false,
         gravKey = "F2",  gravBlock = true, gravEnabled = false,
         fbKey = "F3",    fbBlock = true, fbEnabled = false,
@@ -855,6 +838,7 @@ HotkeyEntry < Panel
     !tooltip: tr('ZAZNACZONE: Hotkey NIE dziala gdy piszesz na czacie.\nODZNACZONE: Hotkey dziala ZAWSZE.')
 
 HotkeyProWindow < MainWindow
+  id: HotkeyProWindow_Unique
   !text: tr('Ustawienia - Hotkey')
   size: 380 400
   @onEscape: self:hide()
@@ -907,46 +891,35 @@ HotkeyProWindow < MainWindow
 ]])
 
 if rootWidget then
-    -- Najpierw czyścimy stare okno hotkeyów
-    local oldH = rootWidget:recursiveGetChildById("HotkeyProWindow_Unique")
-    if oldH then oldH:destroy() end
-
-    local hWindow = UI.createWindow('HotkeyProWindow', rootWidget)
-    hWindow:setId("HotkeyProWindow_Unique") -- Ustawiamy ID
+    local hWindow = UI.createWidget('HotkeyProWindow', rootWidget)
     hWindow:hide()
 
     for _, item in ipairs(hotkeyList) do
         local entry = g_ui.createWidget('HotkeyEntry', hWindow.content)
         entry.lbl:setText(item.name)
         
-        -- Wczytywanie konfiguracji klawisza
         local keyVal = hConfig[item.id .. "Key"] or item.default
         entry.key:setText(keyVal)
 
-        -- Wczytywanie konfiguracji blokowania czatu
         local blockVal = hConfig[item.id .. "Block"]
         if blockVal == nil then blockVal = true end
         entry.block:setChecked(blockVal)
 
-        -- Wczytywanie konfiguracji Włączony/Wyłączony (Enabled)
         local enabledVal = hConfig[item.id .. "Enabled"]
-        if enabledVal == nil then enabledVal = false end -- Domyślnie OFF
+        if enabledVal == nil then enabledVal = false end
         entry.state:setChecked(enabledVal)
         entry.state:setTooltip(enabledVal and "Status: ON" or "Status: OFF")
 
-        -- Logika zmiany tekstu klawisza
         entry.key.onTextChange = function(widget, text)
             hConfig[item.id .. "Key"] = text
         end
 
-        -- Logika checkboxa Chat Block
         entry.block.onClick = function(widget)
             local keyName = item.id .. "Block"
             hConfig[keyName] = not hConfig[keyName]
             widget:setChecked(hConfig[keyName])
         end
 
-        -- Logika checkboxa ON/OFF (po lewej)
         entry.state.onClick = function(widget)
             local keyName = item.id .. "Enabled"
             hConfig[keyName] = not hConfig[keyName]
@@ -999,7 +972,6 @@ onPlayerPositionChange(function(newPos, oldPos)
 end)
 
 onKeyPress(function(keys)
-    -- Reset walka działa zawsze, jeśli klawisz się zgadza (można to też uzależnić od Enabled, ale bezpieczniej zostawić)
     if keys == hConfig.walkKey then
         if lastWalkKeyTime - now < -500 then
             for _, tile in ipairs(g_map.getTiles(posz())) do
@@ -1017,18 +989,11 @@ onKeyPress(function(keys)
     if not player then return end
     local isChatting = modules.game_console and modules.game_console.isChatEnabled()
 
-    -- Nowa funkcja canUse uwzględniająca Enabled
     local function canUse(cfgKey, cfgBlock, cfgEnabled)
-        -- 1. Sprawdź czy hotkey jest włączony (tick po lewej)
         if not hConfig[cfgEnabled] then return false end
-
-        -- 2. Sprawdź klawisz
         local keyStored = hConfig[cfgKey]
         if not keyStored or keys ~= keyStored then return false end
-
-        -- 3. Sprawdź blokadę czatu
         if hConfig[cfgBlock] and isChatting then return false end
-        
         return true
     end
 
@@ -1189,27 +1154,18 @@ end
 
 local backpackSlot = {x=65535, y=SlotBackpack, z=0}
 
--- Funkcja do sprytnego zdejmowania (Rotacja)
--- 1. Probuj wrzucic do Glownego BP (SlotBackpack)
--- 2. Jak sie nie da, wrzuc do kontenera zrodlowego (np. z SSA)
 local function smartUnequip(item, sourceContainerId)
     if not item then return end
-    
-    -- Próba 1: Główny plecak
     if g_game.move(item, backpackSlot, 1) then return end
-    
-    -- Próba 2: Plecak źródłowy (np. ten z którego bierzemy SSA)
     if sourceContainerId then
         for _, c in pairs(getContainers()) do
             if c:getContainerItem():getId() == sourceContainerId then
-                -- Wrzuc na pierwszy wolny slot lub na koniec
                 if g_game.move(item, c:getSlotPosition(c:getItemsCount()), 1) then return end
             end
         end
     end
 end
 
--- --- CHECK BACKPACKS (STARA, SPRAWDZONA WERSJA) ---
 local backtrackingSSA = false
 local backtrackingMR = false
 
@@ -1271,9 +1227,14 @@ end
 
 -- --- MAKRA PODSTAWOWE ---
 
+-- ZMIENIONE BLESS MACRO (WEDŁUG ŻYCZENIA)
+local blessflag = false
 local BlessMacro = macro(1000, function() 
     if systemLoading then return end
-    say("!bless") 
+    if blessflag ~= true then
+        blessflag = true
+        say("!bless")
+    end
 end)
 
 local extrablessflag = false
@@ -1288,7 +1249,6 @@ local AntyRSMacro = macro(10, function()
     if player:getSkull() == 4 then use(8148) end 
 end)
 
--- ANTY PUSH
 local dropItems = {3031, 3035} 
 local dropQuantities = {2, 2}
 local function isTileEmptyOrContainsOnlyStaticItems(pos, destroyFieldId)
@@ -1341,7 +1301,6 @@ onPlayerPositionChange(function()
     end
 end)
 
--- DESTROY FIELD
 local fields = {2121, 2123, 2126}
 local destroyField = 3148
 local DestroyFieldMacro = macro(200, function()
@@ -1434,30 +1393,24 @@ onKeyDown(function(keys)
     end
 end)
 
--- --- AUTO SSA (UJEDNOLICONE) ---
 local AutoSSAMacro = macro(100, function()
     if systemLoading then return end
     
     local ssaId = 3081
     local contId = config.contSsaId or 2869
     
-    -- 1. Otwieranie BP
     checkBackpacks(contId, ssaId, true)
 
-    -- 2. Wykrywanie Default Amuletu (Dynamicznie)
     local defaultAmuletID = nil
     if findOrEquipped(9302, getNeck) then defaultAmuletID = 9302 
     elseif findOrEquipped(9802, getNeck) then defaultAmuletID = 9802 end
 
-    -- 3. Logika Trybów
     local fightMode = g_game.getFightMode()
     local shouldWearSSA = false
     
     if fightMode == 3 then
-        -- Mode 3: Spam (Always)
         shouldWearSSA = true
     elseif fightMode == 2 then
-        -- Mode 2: Threshold
         local isMage = (myVocation == "ED" or myVocation == "MS")
         if isMage then
             if manapercent() <= 70 then shouldWearSSA = true end
@@ -1465,27 +1418,19 @@ local AutoSSAMacro = macro(100, function()
             if hp() <= 70 then shouldWearSSA = true end
         end
     elseif fightMode == 1 then
-        -- Mode 1: Never (Only Default)
         shouldWearSSA = false
     end
 
-    -- 4. Wykonanie
     local currentNeck = getNeck()
-    
     if shouldWearSSA then
-        -- Chcemy SSA
         if not currentNeck or currentNeck:getId() ~= ssaId then
             local item = findItem(ssaId)
             if item then g_game.move(item, {x=65535, y=SlotNeck, z=0}, 1) end
         end
     else
-        -- Chcemy Default (lub nic)
         if currentNeck and currentNeck:getId() == ssaId then
-            -- Zdejmij SSA (Smart Unequip)
             smartUnequip(currentNeck, contId)
         end
-        
-        -- Zaloz Default jesli go nie ma
         if defaultAmuletID then
             if not getNeck() or getNeck():getId() ~= defaultAmuletID then
                 local def = findItem(defaultAmuletID)
@@ -1495,30 +1440,24 @@ local AutoSSAMacro = macro(100, function()
     end
 end)
 
--- --- AUTO MR (UJEDNOLICONE) ---
 local AutoMRMacro = macro(100, function()
     if systemLoading then return end
     
     local mrId = 3048
     local contId = config.contMrId or 2866
     
-    -- 1. Otwieranie BP
     checkBackpacks(contId, mrId, false)
 
-    -- 2. Wykrywanie Default Ringu (Dynamicznie)
     local defaultRingID = nil
     if findOrEquipped(7924, getFinger) then defaultRingID = 7924 
     elseif findOrEquipped(9593, getFinger) then defaultRingID = 9593 end
 
-    -- 3. Logika Trybów
     local fightMode = g_game.getFightMode()
     local shouldWearMR = false
     
     if fightMode == 3 then
-        -- Mode 3: Spam (Always)
         shouldWearMR = true
     elseif fightMode == 2 then
-        -- Mode 2: Threshold
         local isMage = (myVocation == "ED" or myVocation == "MS")
         if isMage then
             if manapercent() <= 65 then shouldWearMR = true end
@@ -1526,27 +1465,19 @@ local AutoMRMacro = macro(100, function()
             if hp() <= 65 then shouldWearMR = true end
         end
     elseif fightMode == 1 then
-        -- Mode 1: Never (Only Default)
         shouldWearMR = false
     end
 
-    -- 4. Wykonanie
     local currentFinger = getFinger()
-    
     if shouldWearMR then
-        -- Chcemy MR
         if not currentFinger or currentFinger:getId() ~= mrId then
             local item = findItem(mrId)
             if item then g_game.move(item, {x=65535, y=SlotFinger, z=0}, 1) end
         end
     else
-        -- Chcemy Default (lub nic)
         if currentFinger and currentFinger:getId() == mrId then
-            -- Zdejmij MR (Smart Unequip)
             smartUnequip(currentFinger, contId)
         end
-        
-        -- Zaloz Default jesli go nie ma
         if defaultRingID then
             if not getFinger() or getFinger():getId() ~= defaultRingID then
                 local def = findItem(defaultRingID)
@@ -1556,7 +1487,6 @@ local AutoMRMacro = macro(100, function()
     end
 end)
 
--- DASZKI (LIMIT FLOOR)
 local FloorLockMacro = macro(500, function()
     if systemLoading then return end
     local gameMapPanel = modules.game_interface.getMapPanel()
@@ -1576,12 +1506,10 @@ onPlayerPositionChange(function(newPos, oldPos)
     end
 end)
 
--- REPAIR BOOTS (NOWE MAKRO)
 local RepairBootsMacro = macro(10000, function()
     if systemLoading then return end
     local feet = getFeet()
     if not feet then return end
-    
     local id = feet:getId()
     if id == 6530 then
       say("!soft")
@@ -1590,13 +1518,9 @@ local RepairBootsMacro = macro(10000, function()
     end    
 end)
 
-
--- --- LISTA SKRYPTÓW (MANAGER) ---
 local scriptsList = {
-    -- TUTAJ DODAŁEM TWOJE BRAKUJĄCE MAKRA
     { key = "GuildHealing_V15", label = "Guild Healing", defaultId = 3160, macro = guildhealing, defaultText="GHeal" },
     { key = "Recognize_V15",    label = "Marker Recog",  defaultId = 3031, macro = recognizeMacro, defaultText="Marker" },
-
     { key = "Bless_V15", label = "Auto Bless", defaultId = 3035, macro = BlessMacro, defaultText="Bless" },
     { key = "ExtraBless_V15", label = "Extra Bless", defaultId = 6561, macro = ExtraBlessMacro, defaultText="ExtraBless" },
     { key = "AntyRS_V15", label = "Anty RS", defaultId = 8148, macro = AntyRSMacro, defaultText="AntyRS" },
@@ -1608,11 +1532,8 @@ local scriptsList = {
     { key = "AutoSSA_V15", label = "Auto SSA", defaultId = 3081, macro = AutoSSAMacro, defaultText="SSA" },
     { key = "AutoMR_V15", label = "Auto MR", defaultId = 3048, macro = AutoMRMacro, defaultText="MR" },
     { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" },
-    -- Dodano Repair Boots
     { key = "RepairBoots_V15", label = "Repair Boots", defaultId = 9020, macro = RepairBootsMacro, defaultText="Repair" },
 }
-
--- --- UI SETUP ---
 
 UI.Separator()
 
@@ -1680,6 +1601,7 @@ ScriptConfigRow < Panel
     text-align: center
 
 BlessSetupWindow < MainWindow
+  id: BlessSetupWindow_Unique
   !text: tr('Ustawienia - Skrypty')
   size: 460 430
   @onEscape: self:hide()
@@ -1799,15 +1721,9 @@ BlessSetupWindow < MainWindow
     width: 120
 ]])
 
-local rootWidget = g_ui.getRootWidget()
 local setupWindow
 if rootWidget then
-    -- Czyścimy stare okno setupu
-    local oldSetup = rootWidget:recursiveGetChildById("BlessSetupWindow_Unique")
-    if oldSetup then oldSetup:destroy() end
-
     setupWindow = UI.createWindow('BlessSetupWindow', rootWidget)
-    setupWindow:setId("BlessSetupWindow_Unique")
     setupWindow:hide()
 
     setupWindow.closeBtn.onClick = function()
@@ -1866,14 +1782,14 @@ UI.Button("Ustawienia - Skrypty", function()
     if setupWindow then setupWindow:show() setupWindow:raise() setupWindow:focus() end
 end)
 
+-- GŁÓWNY PANEL Z WPISANYM ID W DEFINICJĘ
 local mainPanel = setupUI([[
 Panel
-  id: mainPanelContainer
+  id: GuildBot_Main_Panel_V15
   layout:
     type: verticalBox
     fit-children: true
 ]])
-mainPanel:setId(uniquePanelID) -- To jest kluczowe ID!
 
 local activeWidgets = {}
 
@@ -1911,9 +1827,7 @@ for _, s in ipairs(scriptsList) do
     end
 end
 
--- ==========================================================
--- PRZYWRACANIE STANU (Natychmiastowe)
--- ==========================================================
+-- PRZYWRACANIE STANU
 for _, s in ipairs(scriptsList) do
     if s.macro then
         local savedState = config["state" .. s.key]
@@ -1936,11 +1850,9 @@ for _, s in ipairs(scriptsList) do
     end
 end
 
-systemLoading = false -- Zdejmujemy bezpiecznik
+systemLoading = false
 
--- ==========================================================
--- ZAPISYWANIE STANU (Pętla)
--- ==========================================================
+-- ZAPISYWANIE STANU
 macro(500, function()
     for _, s in ipairs(scriptsList) do
         if s.macro then
@@ -1970,93 +1882,14 @@ end)
 
 UI.Separator()
 local paralLabel = UI.Label("AutoParal (ED Only):")
-paralLabel:setId("ParalLabel_Unique")
-paralLabel:hide() -- Domyślnie ukryte
+paralLabel:setId("GuildBot_Paral_Label")
+paralLabel:hide()
 paralLabel:setHeight(0)
--- Czyszczenie starych labeli paral
-if rootWidget then
-    local oldP = rootWidget:recursiveGetChildById("ParalLabel_Unique")
-    if oldP and oldP ~= paralLabel then oldP:destroy() end
-end
 
-local function normalizeName(name)
-    return name:lower():gsub("^%s*(.-)%s*$", "%1"):gsub("[^%w]", "")
-end
-
-enemyListTable = {}
-local enemyURL = "https://pastebin.com/raw/11gxpPkc"
-
-local function loadEnemyListFromURL(callback)
-    if not enemyURL or enemyURL == "" then
-        print("Brak URL do listy wrogów")
-        if callback then callback("error") end
-        return
-    end
-
-    local http = modules.corelib.HTTP
-    http.get(enemyURL, function(response)
-        if not response then
-            print("Error fetching enemyList from URL")
-            if callback then callback("error") end
-            return
-        end
-
-        local sanitizedScript = response:gsub("\r\n", ""):gsub("\n", ""):gsub("^%s*,", ""):gsub(",%s*$", ""):gsub("^%s*", ""):gsub("%s*$", "")
-        
-        enemyListTable = {}
-        local count = 0
-        
-        for entry in sanitizedScript:gmatch("{[^}]+}") do
-            local nickname = entry:match('Nick = "([^"]+)"')
-            local profesja = entry:match('Vocation = "([^"]+)"')
-            
-            if nickname and profesja then
-                    local normalizedNickname = normalizeName(nickname)
-                    enemyListTable[normalizedNickname] = {
-                        profession = profesja
-                    }
-                    count = count + 1
-            end
-        end
-        
-        if callback then callback() end
-    end, function(error)
-        print("Błąd podczas pobierania danych z Pastebin: " .. tostring(error))
-        if callback then callback("error") end
-    end)
-end
-
-function isLocalEnemy(name)
-    if not storage.enemyList or storage.enemyList == "" then
-        return false
-    end
-    
-    local enemyList = string.split(storage.enemyList, "\n")
-    local normalizedName = normalizeName(name)
-    
-    for _, enemyName in ipairs(enemyList) do
-        if normalizeName(enemyName) == normalizedName then
-            return true
-        end
-    end
-    return false
-end
-
-function isApiEnemy(name)
-    return enemyListTable[normalizeName(name)] ~= nil
-end
-
-function isEnemyFromList(name)
-    return isLocalEnemy(name) or isApiEnemy(name)
-end
-
-if enemyURL and enemyURL ~= "" then
-    loadEnemyListFromURL()
-end
-
--- Definicja UI (Bez More SQM)
+-- Definicja UI
 local ui = setupUI([[
 Panel
+  id: GuildBot_Paral_UI
   height: 85
 
   Button
@@ -2095,18 +1928,9 @@ Panel
     !text: tr('CanShoot Only')
 ]])
 
--- Domyślnie ukryj panel na starcie
-ui:setId("ParalUI_Unique")
 ui:hide()
 ui:setHeight(0)
 
--- Czyszczenie starych paneli paral
-if rootWidget then
-    local oldPUI = rootWidget:recursiveGetChildById("ParalUI_Unique")
-    if oldPUI and oldPUI ~= ui then oldPUI:destroy() end
-end
-
--- Obsługa przycisku w panelu
 ui.editListBtn.onClick = function()
     local editWin = UI.MultilineEditorWindow(storage.enemyList or "", {
         title = "Enemy List", 
@@ -2165,7 +1989,6 @@ local function getSkullValue(skull)
 end
 
 local function isOnScreen(p1, p2)
-    -- Sztywne ustawienie na 7x5 (Standardowy ekran)
     return math.abs(p1.x - p2.x) <= 7 and math.abs(p1.y - p2.y) <= 5
 end
 
@@ -2173,9 +1996,8 @@ local function distance(p1, p2)
     return math.max(math.abs(p1.x - p2.x), math.abs(p1.y - p2.y))
 end
 
--- MAKRA LOGIKI PARALA
 local AutoParalRuneMacro = macro(200, function()
-    if myVocation ~= "ED" then return end -- Zabezpieczenie
+    if myVocation ~= "ED" then return end
 
     if not isInPz() and not g_game.isSafeFight() then
         local target = g_game.getAttackingCreature()
@@ -2183,7 +2005,6 @@ local AutoParalRuneMacro = macro(200, function()
             local targetName = target:getName()
             local normalizedName = normalizeName(targetName)
             local isMagic = isMagicProfession(enemyListTable[normalizedName] and enemyListTable[normalizedName].profession or "")
-            -- Manualni zawsze traktowani jako magiczni (priorytet)
             if isLocalEnemy(targetName) then isMagic = true end
 
             if (not config.magicProfessionOnly or isMagic) then
@@ -2225,10 +2046,10 @@ local AutoParalRuneMacro = macro(200, function()
         end
     end
 end)
-AutoParalRuneMacro.setOff() -- Domyślnie wyłączone
+AutoParalRuneMacro.setOff()
 
 local AutoParalBombMacro = macro(200, function()
-    if myVocation ~= "ED" then return end -- Zabezpieczenie
+    if myVocation ~= "ED" then return end
 
     if not isInPz() and not g_game.isSafeFight() then
         local target = g_game.getAttackingCreature()
@@ -2237,7 +2058,6 @@ local AutoParalBombMacro = macro(200, function()
             return
         end
 
-        -- kiedy mamy aktualny target (atakowany przez nas)
         if target then
             if target:canShoot() and manapercent() > 80 then
                 local dist = distance(g_game.getLocalPlayer():getPosition(), target:getPosition())
@@ -2262,7 +2082,6 @@ local AutoParalBombMacro = macro(200, function()
             return
         end
 
-        -- kiedy nie mamy bezpośredniego targeta (szukamy w spektatorach)
         for _, creature in ipairs(getSpectators()) do
             if creature:isPlayer() then
                 local creatureName = creature:getName()
@@ -2300,16 +2119,15 @@ local AutoParalBombMacro = macro(200, function()
         end
     end
 end)
-AutoParalBombMacro.setOff() -- Domyślnie wyłączone
+AutoParalBombMacro.setOff()
 
--- Ikony - tworzymy i od razu ukrywamy
 local runeIcon = addIcon("autoParalRunaIcon", { item = 3165, text = "Runa ", moveable = true }, function(icon)
     if myVocation == "ED" then
         AutoParalRuneMacro.toggle()
         if AutoParalRuneMacro.isOn() then icon:setOn() else icon:setOff() end
     end
 end)
-if runeIcon then runeIcon:hide() end -- Start ukryte
+if runeIcon then runeIcon:hide() end
 
 local bombIcon = addIcon("autoParalBombaIcon", { item = 9016, text = "Bomb ", moveable = true }, function(icon)
     if myVocation == "ED" then
@@ -2317,9 +2135,8 @@ local bombIcon = addIcon("autoParalBombaIcon", { item = 9016, text = "Bomb ", mo
         if AutoParalBombMacro.isOn() then icon:setOn() else icon:setOff() end
     end
 end)
-if bombIcon then bombIcon:hide() end -- Start ukryte
+if bombIcon then bombIcon:hide() end
 
--- Ukrywanie/Pokazywanie panelu i ikon jeśli ED
 macro(1000, function()
     if myVocation == "ED" then
         if not ui:isVisible() then
@@ -2339,7 +2156,6 @@ macro(1000, function()
             if runeIcon then runeIcon:hide() end
             if bombIcon then bombIcon:hide() end
             
-            -- Opcjonalnie: Wyłącz makra jeśli zmienimy postać na inną niż ED
             if AutoParalRuneMacro.isOn() then AutoParalRuneMacro.setOff() end
             if AutoParalBombMacro.isOn() then AutoParalBombMacro.setOff() end
         end
