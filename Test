@@ -436,6 +436,20 @@ schedule(300, function()
                 end
             end
         end)
+        
+        -- !!! PRZYWRÓCONA OBSŁUGA KLAWISZY HOLD MW/WG !!!
+        onKeyDown(function(keys)
+            if not HoldMwallMacro.isOn() or modules.game_console.isChatEnabled() then return end
+            if keys == config.holdMwKey or keys == config.holdWgKey then
+                local tile = getTileUnderCursor()
+                if tile then
+                    if tile:getText():find("HOLD") then tile:setText("") else
+                        tile:setText(keys == config.holdMwKey and "HOLD MW" or "HOLD WG")
+                        table.insert(holdCandidates, tile:getPosition())
+                    end
+                end
+            end
+        end)
 
         local AutoSSAMacro = macro(100, function()
             if not amIAlive() then return end
@@ -1574,10 +1588,12 @@ BlessSetupWindow < MainWindow
         end
 
         local activeWidgets = {}
+        -- First pass: Safety check to turn macros OFF visually/logically if needed
         for _, s in ipairs(scriptsList) do
             if s.macro then safeSetOff(s.macro) end
         end
 
+        -- Second pass: Create Widgets
         for _, s in ipairs(scriptsList) do
             if s.macro then
                 local showPanel = config["show" .. s.key]
@@ -1594,7 +1610,8 @@ BlessSetupWindow < MainWindow
                 elseif showPanel then
                     local switch = UI.createWidget('BotSwitch', mainPanel)
                     switch:setText(s.label)
-                    switch:setOn(false)
+                    switch:setOn(true) -- Wymuszenie odswiezenia grafiki (zgodnie z dzialajacym wzorcem)
+                    switch:setOn(false) -- Reset do wylaczonego
                     
                     switch.onClick = function(w)
                         s.macro.toggle()
@@ -1607,6 +1624,7 @@ BlessSetupWindow < MainWindow
             end
         end
 
+        -- Third pass: Restore State from Config (Only enable if it was enabled before)
         for _, s in ipairs(scriptsList) do
             if s.macro then
                 local savedState = config["state" .. s.key]
