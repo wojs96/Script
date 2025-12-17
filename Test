@@ -1530,20 +1530,6 @@ onPlayerPositionChange(function(newPos, oldPos)
     end
 end)
 
--- REPAIR BOOTS (NOWE MAKRO)
-local RepairBootsMacro = macro(10000, function()
-    if systemLoading then return end
-    local feet = getFeet()
-    if not feet then return end
-    
-    local id = feet:getId()
-    if id == 6530 then
-      say("!soft")
-    elseif id == 9020 then
-      say("!cyleria boots")
-    end   
-end)
-
 
 -- --- LISTA SKRYPTÓW (MANAGER) ---
 local scriptsList = {
@@ -1558,8 +1544,6 @@ local scriptsList = {
     { key = "AutoSSA_V15", label = "Auto SSA", defaultId = 3081, macro = AutoSSAMacro, defaultText="SSA" },
     { key = "AutoMR_V15", label = "Auto MR", defaultId = 3048, macro = AutoMRMacro, defaultText="MR" },
     { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" },
-    -- Dodano Repair Boots
-    { key = "RepairBoots_V15", label = "Repair Boots", defaultId = 9020, macro = RepairBootsMacro, defaultText="Repair" },
 }
 
 -- --- UI SETUP ---
@@ -1753,7 +1737,7 @@ local rootWidget = g_ui.getRootWidget()
 local setupWindow
 if rootWidget then
     setupWindow = UI.createWindow('BlessSetupWindow', rootWidget)
-    if registeredWidgets then table.insert(registeredWidgets, setupWindow) end -- Obsługa wrappera czyszczącego
+    table.insert(registeredWidgets, setupWindow) -- Rejestracja okna
     setupWindow:hide()
 
     setupWindow.closeBtn.onClick = function()
