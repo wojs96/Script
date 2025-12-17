@@ -7,6 +7,7 @@ local function KILL_EVERYTHING()
     local ids = {
         "GuildBot_Main_Panel_FINAL_V15",
         "GuildBot_Paral_UI_V15", 
+        "GuildBot_Config_Panel_V15",
         "GuildBot_Guild_Label",
         "GuildBot_Enemy_Label",
         "GuildBot_Paral_Label",
@@ -167,20 +168,15 @@ schedule(300, function()
         g_keyboard.unbindKeyDown("Enter", console.consolePanel)
         g_keyboard.bindKeyDown("Enter", sendGuildMessage, console.consolePanel)
 
-        addSeparator()
-        addLabel("", "Guild Scripts")
-        addSeparator()
-
         guildhealing = macro(9999, "Guild Healing", function() end)
         local recognizeMacro = macro(9999, "Marker", function() end)
-
+        
         local myVocation
         local vocationRegex = [[You see yourself. You are a (%a+ %a+)]]
 
         local function checkMyVocation()
             if not amIAlive() then return end
             if myVocation then return end
-
             g_game.look(player)
             schedule(1000, checkMyVocation)
         end
@@ -196,7 +192,6 @@ schedule(300, function()
                 else myVocation = "Unknown" end
             end
         end)
-
         checkMyVocation()
 
         macro(200, function()
@@ -625,94 +620,7 @@ Label
             end
         end
 
-        addLabel("", "v Commander Name v")
-        UI.TextEdit(storage.commander or "Gladiator", function(widget, newText)
-            newText = newText:match("^%s*(.-)%s*$") or ""
-
-            if newText == "" then
-                if storage.commander and storage.commander ~= "" then
-                    clearLeaderMark(storage.commander)
-                end
-                storage.commander = ""
-                lastLeaderName = nil
-                return
-            end
-
-            if lastLeaderName and normalizeName(lastLeaderName) ~= normalizeName(newText) then
-                clearLeaderMark(lastLeaderName)
-            end
-
-            storage.commander = newText
-            lastLeaderName = newText
-
-            local creature = getCreatureByName(newText)
-            if creature and creature:isPlayer() then
-                applyLeaderMark(creature)
-            end
-        end)
-
-        schedule(500, function()
-            if not amIAlive() then return end
-            if not recognizeMacro.isOn() then return end
-
-            local spectators = g_map.getSpectators(g_game.getLocalPlayer():getPosition(), false)
-
-            for _, creature in pairs(spectators) do
-                if creature:isPlayer() then
-                    processCreatureRecognition(creature)
-                end
-            end
-
-        end)
-
-        local function refreshPlayers()
-            if not amIAlive() then return end
-            if not recognizeMacro.isOn() then return end
-            local localPlayer = g_game.getLocalPlayer()
-            local creatures = g_map.getSpectators(localPlayer:getPosition(), false)
-
-            for _, creature in pairs(creatures) do
-                if creature:isPlayer() and creature ~= localPlayer then
-                    local key = normalizeName(creature:getName())
-                    local enemy = enemyList[key]
-
-                    local iscommander = (normalizeName(creature:getName()) == normalizeName(storage.commander))
-
-                    if iscommander then
-                        creature:showStaticSquare("green")
-                    elseif enemy and enemy.isTarget then
-                        creature:showStaticSquare("red")
-                    elseif enemy then
-                        local _, colorName = getVocationColor(enemy.Vocation)
-                        creature:showStaticSquare(colorName)
-                    elseif creature:getEmblem() == 1 or creature:getEmblem() == 4 or isAllied(creature:getName()) then
-                        creature:showStaticSquare("white")
-                    else
-                        creature:hideStaticSquare("")
-                    end
-
-                    if iscommander then
-                        creature:setText("\nL", "green")
-                    elseif enemy and enemy.isTarget then
-                        creature:setText("\n" .. formatHPMP(enemy.HPMP) .. "\nTARGET", "red")
-                    elseif enemy then
-                        local _, colorName = getVocationColor(enemy.Vocation)
-                        creature:setText("\n" .. formatHPMP(enemy.HPMP), colorName)
-                    elseif creature:getEmblem() == 1 or creature:getEmblem() == 4 or isAllied(creature:getName()) then
-                        creature:setText("\nF", "white")
-                    else
-                        creature:setText("", "white")
-                    end
-                end
-            end
-
-            schedule(30, refreshPlayers)
-        end
-
-        refreshPlayers()
-
         addLabel("", "")
-
         addSeparator()
         addLabel("", "Konfiguracja")
         addSeparator()
@@ -766,11 +674,10 @@ Label
             return nil
         end
 
-        UI.Separator()
-
-        local hotkeyUI = setupUI([[
+        local configPanel = setupUI([[
 Panel
-  height: 30
+  id: GuildBot_Config_Panel_V15
+  height: 55
 
   Button
     id: settingsBtn
@@ -779,6 +686,15 @@ Panel
     anchors.right: parent.right
     text: Ustawienia - Hotkey
     height: 20
+
+  Button
+    id: scriptsBtn
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text: Ustawienia - Skrypty
+    height: 20
+    margin-top: 5
 ]])
 
         g_ui.loadUIFromString([[
@@ -915,7 +831,7 @@ HotkeyProWindow < MainWindow
                 end
             end
 
-            hotkeyUI.settingsBtn.onClick = function()
+            configPanel.settingsBtn.onClick = function()
                 if hWindow:isVisible() then
                     hWindow:hide()
                 else
@@ -1496,10 +1412,258 @@ HotkeyProWindow < MainWindow
             { key = "HoldMwall_V15", label = "Hold Mwall", defaultId = 3180, macro = HoldMwallMacro, defaultText="HoldMW" },
             { key = "AutoSSA_V15", label = "Auto SSA", defaultId = 3081, macro = AutoSSAMacro, defaultText="SSA" },
             { key = "AutoMR_V15", label = "Auto MR", defaultId = 3048, macro = AutoMRMacro, defaultText="MR" },
-            { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" }
+            { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" },
         }
 
-        UI.Separator()
+        g_ui.loadUIFromString([[
+ScriptConfigRow < Panel
+  height: 24
+  margin-top: 2
+  background-color: #00000020
+
+  Label
+    id: lblName
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    width: 100
+    text-align: left
+    text-offset: 5 0
+    font: verdana-11px-rounded
+
+  CheckBox
+    id: checkShow
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 60
+    text: Panel
+    font: verdana-11px-rounded
+
+  CheckBox
+    id: checkIcon
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 60
+    text: Icon
+    font: verdana-11px-rounded
+
+  Label
+    text: Txt:
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 25
+    font: verdana-11px-rounded
+
+  TextEdit
+    id: txtIconText
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 95
+    height: 18
+    font: verdana-11px-rounded
+    text-align: center
+
+  Label
+    text: ID:
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 20
+    font: verdana-11px-rounded
+
+  TextEdit
+    id: txtId
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 40
+    height: 18
+    font: verdana-11px-rounded
+    text-align: center
+
+BlessSetupWindow < MainWindow
+  id: BlessSetupWindow_Unique
+  !text: tr('Ustawienia - Skrypty')
+  size: 460 430
+  @onEscape: self:hide()
+
+  Label
+    text: Wybierz tryb wyswietlania (Ikona LUB Panel)
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: center
+    font: verdana-11px-rounded
+    margin-bottom: 5
+
+  ScrollablePanel
+    id: contentList
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: sep1.top
+    margin-bottom: 5
+    vertical-scrollbar: scrollbar
+    layout:
+      type: verticalBox
+
+  VerticalScrollBar
+    id: scrollbar
+    anchors.top: contentList.top
+    anchors.bottom: contentList.bottom
+    anchors.right: contentList.right
+    step: 14
+    pixels-scroll: true
+
+  HorizontalSeparator
+    id: sep1
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: lblMw.top
+    margin-bottom: 10
+
+  Label
+    id: lblMw
+    text: MW Hotkey:  
+    anchors.left: parent.left
+    anchors.bottom: lblWg.top
+    margin-bottom: 8
+    font: verdana-11px-rounded
+    width: 70
+
+  TextEdit
+    id: txtMw
+    anchors.left: prev.right
+    anchors.verticalCenter: lblMw.verticalCenter
+    width: 80
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
+
+  Label
+    id: lblSsaBp
+    text: SSA BP ID:
+    anchors.left: txtMw.right
+    anchors.verticalCenter: lblMw.verticalCenter
+    margin-left: 20
+    font: verdana-11px-rounded
+    width: 70
+
+  TextEdit
+    id: txtSsaBp
+    anchors.left: prev.right
+    anchors.verticalCenter: lblMw.verticalCenter
+    width: 50
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
+
+  Label
+    id: lblWg
+    text: WG Hotkey:
+    anchors.left: parent.left
+    anchors.bottom: closeBtn.top
+    margin-bottom: 12
+    font: verdana-11px-rounded
+    width: 70
+
+  TextEdit
+    id: txtWg
+    anchors.left: prev.right
+    anchors.verticalCenter: lblWg.verticalCenter
+    width: 80
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
+
+  Label
+    id: lblMrBp
+    text: MR BP ID:
+    anchors.left: txtWg.right
+    anchors.verticalCenter: lblWg.verticalCenter
+    margin-left: 20
+    font: verdana-11px-rounded
+    width: 70
+
+  TextEdit
+    id: txtMrBp
+    anchors.left: prev.right
+    anchors.verticalCenter: lblWg.verticalCenter
+    width: 50
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
+
+  Button
+    id: closeBtn
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    text: Zamknij (Przeladuj)
+    width: 120
+]])
+
+        if g_ui.getRootWidget() then
+            local sWindow = UI.createWidget('BlessSetupWindow', g_ui.getRootWidget())
+            sWindow:hide()
+            
+            for _, script in ipairs(scriptsList) do
+                local row = g_ui.createWidget('ScriptConfigRow', sWindow.contentList)
+                row.lblName:setText(script.label)
+                
+                local showKey = "show" .. script.key
+                local iconKey = "icon" .. script.key
+
+                row.checkShow:setChecked(config[showKey])
+                row.checkIcon:setChecked(config[iconKey])
+
+                row.checkShow.onClick = function(w)
+                    local newState = not config[showKey]
+                    config[showKey] = newState
+                    w:setChecked(newState)
+                    if newState then
+                        config[iconKey] = false
+                        row.checkIcon:setChecked(false)
+                    end
+                end
+                
+                row.checkIcon.onClick = function(w)
+                    local newState = not config[iconKey]
+                    config[iconKey] = newState
+                    w:setChecked(newState)
+                    if newState then
+                        config[showKey] = false
+                        row.checkShow:setChecked(false)
+                    end
+                end
+                
+                row.txtIconText:setText(config["text" .. script.key] or script.defaultText)
+                row.txtIconText.onTextChange = function(w, text) config["text" .. script.key] = text end
+                
+                row.txtId:setText(config["id" .. script.key] or script.defaultId)
+                row.txtId.onTextChange = function(w, text) config["id" .. script.key] = tonumber(text) or script.defaultId end
+            end
+
+            sWindow.txtMw:setText(config.holdMwKey or "F11")
+            sWindow.txtMw.onTextChange = function(w, text) config.holdMwKey = text end
+            sWindow.txtWg:setText(config.holdWgKey or "F12")
+            sWindow.txtWg.onTextChange = function(w, text) config.holdWgKey = text end
+            sWindow.txtSsaBp:setText(config.contSsaId or 2869)
+            sWindow.txtSsaBp.onTextChange = function(w, text) if tonumber(text) then config.contSsaId = tonumber(text) end end
+            sWindow.txtMrBp:setText(config.contMrId or 2866)
+            sWindow.txtMrBp.onTextChange = function(w, text) if tonumber(text) then config.contMrId = tonumber(text) end end
+
+            configPanel.scriptsBtn.onClick = function()
+                if sWindow:isVisible() then
+                    sWindow:hide()
+                else
+                    sWindow:show()
+                    sWindow:raise()
+                    sWindow:focus()
+                end
+            end
+
+            sWindow.closeBtn.onClick = function()
+                sWindow:hide()
+                reload()
+            end
+        end
 
         local mainPanel = setupUI([[
 Panel
@@ -1595,17 +1759,48 @@ Panel
             end
         end)
 
-        UI.Separator()
-        local paralLabel = UI.Label("AutoParal (ED Only):")
-        paralLabel:setId("GuildBot_Paral_Label")
+        addLabel("", "")
+        addLabel("", "v Commander Name v")
+        UI.TextEdit(storage.commander or "Gladiator", function(widget, newText)
+            newText = newText:match("^%s*(.-)%s*$") or ""
+
+            if newText == "" then
+                if storage.commander and storage.commander ~= "" then
+                    clearLeaderMark(storage.commander)
+                end
+                storage.commander = ""
+                lastLeaderName = nil
+                return
+            end
+
+            if lastLeaderName and normalizeName(lastLeaderName) ~= normalizeName(newText) then
+                clearLeaderMark(lastLeaderName)
+            end
+
+            storage.commander = newText
+            lastLeaderName = newText
+
+            local creature = getCreatureByName(newText)
+            if creature and creature:isPlayer() then
+                applyLeaderMark(creature)
+            end
+        end)
+
+        local paralLabel = setupUI([[
+Label
+  id: GuildBot_Paral_Label
+  text: AutoParal (ED Only):
+  font: verdana-11px-rounded
+  margin-top: 5
+    ]], mainPanel)
         paralLabel:hide()
-        paralLabel:setHeight(0)
-
-        local ui = setupUI([[
+        
+        local paralUI = setupUI([[
 Panel
-  id: GuildBot_Paral_UI_V15
+  id: GuildBot_Paral_Hidden_Panel
   height: 85
-
+  margin-top: 2
+  
   Button
     id: editListBtn
     anchors.top: parent.top
@@ -1613,9 +1808,6 @@ Panel
     anchors.right: parent.right
     text: Manual Enemy List
     height: 20
-    margin-bottom: 5
-    font: verdana-11px-rounded
-
   CheckBox
     id: magicProfessionCheckBox
     anchors.top: prev.bottom
@@ -1624,7 +1816,6 @@ Panel
     text-align: left
     !text: tr('Paral Mages Only')
     margin-top: 5
-
   CheckBox
     id: skullOnlyCheckBox
     anchors.top: prev.bottom
@@ -1632,7 +1823,6 @@ Panel
     anchors.right: parent.right
     text-align: left
     !text: tr('Paral Skull Only')
-
   CheckBox
     id: canShootOnlyCheckBox
     anchors.top: prev.bottom
@@ -1640,84 +1830,31 @@ Panel
     anchors.right: parent.right
     text-align: left
     !text: tr('CanShoot Only')
-]])
+    ]], mainPanel)
+        paralUI:hide()
+        paralUI:setHeight(0)
 
-        ui:hide()
-        ui:setHeight(0)
-
-        ui.editListBtn.onClick = function()
-            local editWin = UI.MultilineEditorWindow(storage.enemyList or "", {
-                title = "Enemy List", 
-                description = "Lista wrogow do paralowania. PD paralowane automatycznie - ich nickow nie trzeba dodawac.\nPrzyklad:\nPlayer1\nPlayer2"
-            }, function(text)
-                storage.enemyList = text
-                print("Enemy List zaktualizowana!")
-            end)
+        paralUI.editListBtn.onClick = function()
+            local editWin = UI.MultilineEditorWindow(storage.enemyList or "", {title="Enemy List"}, function(t) storage.enemyList = t end)
         end
+        paralUI.magicProfessionCheckBox:setChecked(config.magicProfessionOnly)
+        paralUI.magicProfessionCheckBox.onCheckChange = function(self, c) config.magicProfessionOnly = c end
+        paralUI.skullOnlyCheckBox:setChecked(config.skullOnly)
+        paralUI.skullOnlyCheckBox.onCheckChange = function(self, c) config.skullOnly = c end
+        paralUI.canShootOnlyCheckBox:setChecked(config.canShootOnly)
+        paralUI.canShootOnlyCheckBox.onCheckChange = function(self, c) config.canShootOnly = c end
 
-        storage.autoParalSettings = storage.autoParalSettings or {
-            magicProfessionOnly = false,
-            skullOnly = false,
-            canShootOnly = false
-        }
-
-        local config = storage.autoParalSettings
-
-        ui.magicProfessionCheckBox:setChecked(config.magicProfessionOnly)
-        ui.skullOnlyCheckBox:setChecked(config.skullOnly)
-        ui.canShootOnlyCheckBox:setChecked(config.canShootOnly)
-
-        ui.magicProfessionCheckBox.onCheckChange = function(self, checked)
-            config.magicProfessionOnly = checked
-        end
-
-        ui.skullOnlyCheckBox.onCheckChange = function(self, checked)
-            config.skullOnly = checked
-        end
-
-        ui.canShootOnlyCheckBox.onCheckChange = function(self, checked)
-            config.canShootOnly = checked
-        end
-
-        local runeIcon = addIcon("autoParalRunaIcon", { item = 3165, text = "Runa ", moveable = true }, function(icon)
-            if myVocation == "ED" then
-                AutoParalRuneMacro.toggle()
-                if AutoParalRuneMacro.isOn() then icon:setOn() else icon:setOff() end
-            end
-        end)
+        local runeIcon = addIcon("autoParalRunaIcon", {item=3165, text="Runa", movable=true}, function(icon) if myVocation == "ED" then AutoParalRuneMacro.toggle() end end)
         if runeIcon then runeIcon:hide() end
-
-        local bombIcon = addIcon("autoParalBombaIcon", { item = 9016, text = "Bomb ", moveable = true }, function(icon)
-            if myVocation == "ED" then
-                AutoParalBombMacro.toggle()
-                if AutoParalBombMacro.isOn() then icon:setOn() else icon:setOff() end
-            end
-        end)
+        local bombIcon = addIcon("autoParalBombaIcon", {item=9016, text="Bomb", movable=true}, function(icon) if myVocation == "ED" then AutoParalBombMacro.toggle() end end)
         if bombIcon then bombIcon:hide() end
 
         macro(1000, function()
             if not amIAlive() then return end
             if myVocation == "ED" then
-                if not ui:isVisible() then
-                    ui:show()
-                    ui:setHeight(85)
-                    paralLabel:show()
-                    paralLabel:setHeight(15)
-                    if runeIcon then runeIcon:show() end
-                    if bombIcon then bombIcon:show() end
-                end
+                if not paralUI:isVisible() then paralUI:show() paralUI:setHeight(85) paralLabel:show() if runeIcon then runeIcon:show() end if bombIcon then bombIcon:show() end end
             else
-                if ui:isVisible() then
-                    ui:hide()
-                    ui:setHeight(0)
-                    paralLabel:hide()
-                    paralLabel:setHeight(0)
-                    if runeIcon then runeIcon:hide() end
-                    if bombIcon then bombIcon:hide() end
-                    
-                    if AutoParalRuneMacro.isOn() then AutoParalRuneMacro.setOff() end
-                    if AutoParalBombMacro.isOn() then AutoParalBombMacro.setOff() end
-                end
+                if paralUI:isVisible() then paralUI:hide() paralUI:setHeight(0) paralLabel:hide() if runeIcon then runeIcon:hide() end if bombIcon then bombIcon:hide() end if AutoParalRuneMacro.isOn() then AutoParalRuneMacro.setOff() end if AutoParalBombMacro.isOn() then AutoParalBombMacro.setOff() end end
             end
         end)
 
