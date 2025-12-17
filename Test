@@ -4,8 +4,6 @@
 -- Ta sekcja wykonuje się natychmiast. Działa jak załadowanie pustego pliku.
 
 -- 1. Zmiana Tokena Globalnego.
--- Stare instancje skryptu (makra, pętle) sprawdzają ten token.
--- Gdy go zmieniamy tutaj, one widzą zmianę i natychmiast przerywają działanie (return).
 local BOOT_TOKEN = os.time() .. "_" .. math.random(10000, 99999)
 storage.guildBot_ActiveToken = BOOT_TOKEN
 
@@ -14,7 +12,6 @@ local function executeCleanUp()
     local root = g_ui.getRootWidget()
     local map = modules.game_interface.getMapPanel()
     
-    -- Lista ID wszystkich elementów stworzonych przez ten skrypt
     local garbageIDs = {
         "GuildBot_Main_Panel_V15",
         "GuildBot_Paral_UI_V15",
@@ -37,34 +34,26 @@ local function executeCleanUp()
     end
 end
 
--- Wykonaj czyszczenie TERAZ.
 executeCleanUp()
-
--- W TYM MOMENCIE KOŃCZY SIĘ FAZA 1.
--- Przez następne 200ms skrypt "nie istnieje". Stary został zabity tokenem, nowy czeka.
 
 -- ==========================================================
 -- FAZA 2: WŁAŚCIWY SKRYPT (Startuje po 200ms)
 -- ==========================================================
 
 schedule(200, function()
-    -- Bezpiecznik: Jeśli w ciągu tych 200ms kliknąłeś "Reload" ponownie,
-    -- to ten kod się nie wykona, bo token w storage będzie już inny.
     if storage.guildBot_ActiveToken ~= BOOT_TOKEN then return end
 
-    -- Definicja funkcji sprawdzającej czy skrypt żyje
     local function isLive()
         return storage.guildBot_ActiveToken == BOOT_TOKEN
     end
 
-    -- === WRAPPERY (Muszą być wewnątrz schedule, aby widziały isLive) ===
+    -- === WRAPPERY ===
 
     local _original_macro = macro
     macro = function(delay, funcOrName, func)
         local callback = func
         if type(funcOrName) == "function" then callback = funcOrName end
         
-        -- To zabezpiecza makra przed działaniem po kolejnym reloadzie
         local protectedCallback = function()
             if not isLive() then return end
             if callback then callback() end
@@ -103,7 +92,7 @@ schedule(200, function()
     end
 
     -- ======================================================
-    -- KOD WŁAŚCIWY (WKLEJONY BEZ ZMIAN W LOGICE)
+    -- KOD WŁAŚCIWY
     -- ======================================================
 
     setDefaultTab("Guild")
@@ -203,9 +192,8 @@ schedule(200, function()
     addLabel("", "Guild Scripts")
     addSeparator()
 
-    -- MAKRA GLOBALNE (żeby scriptsList je widział)
+    -- MAKRA GLOBALNE
     guildhealing = macro(9999, "Guild Healing", function() end)
-    -- MAKRA LOKALNE
     local recognizeMacro = macro(9999, "Marker", function() end)
 
     local myVocation
@@ -603,31 +591,35 @@ schedule(200, function()
     end
 
     -- WIDGETY Z WBUDOWANYM ID
-    local guildWidget = setupUI([[Label
-      id: GuildBot_Guild_Label
-      color: green
-      font: verdana-11px-rounded
-      height: 12
-      background-color: #00000040
-      opacity: 0.87
-      anchors.left: parent.left
-      anchors.top: parent.top
-      text-auto-resize: true
-      margin-left: 0
-      margin-top: 2]], modules.game_interface.getMapPanel())
+local guildWidget = setupUI([[
+Label
+  id: GuildBot_Guild_Label
+  color: green
+  font: verdana-11px-rounded
+  height: 12
+  background-color: #00000040
+  opacity: 0.87
+  anchors.left: parent.left
+  anchors.top: parent.top
+  text-auto-resize: true
+  margin-left: 0
+  margin-top: 2
+]], modules.game_interface.getMapPanel())
 
-    local enemyWidget = setupUI([[Label
-      id: GuildBot_Enemy_Label
-      color: red
-      font: verdana-11px-rounded
-      height: 12
-      background-color: #00000040
-      opacity: 0.87
-      anchors.left: parent.left
-      anchors.top: parent.top
-      text-auto-resize: true
-      margin-left: 0
-      margin-top: 15]], modules.game_interface.getMapPanel())
+local enemyWidget = setupUI([[
+Label
+  id: GuildBot_Enemy_Label
+  color: red
+  font: verdana-11px-rounded
+  height: 12
+  background-color: #00000040
+  opacity: 0.87
+  anchors.left: parent.left
+  anchors.top: parent.top
+  text-auto-resize: true
+  margin-left: 0
+  margin-top: 15
+]], modules.game_interface.getMapPanel())
 
     macro(1000, function()
         if recognizeMacro.isOff() then return end
@@ -798,114 +790,114 @@ schedule(200, function()
 
     UI.Separator()
 
-    local hotkeyUI = setupUI([[
-    Panel
-      height: 30
+local hotkeyUI = setupUI([[
+Panel
+  height: 30
 
-      Button
-        id: settingsBtn
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        text: Ustawienia - Hotkey
-        height: 20
-    ]])
+  Button
+    id: settingsBtn
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text: Ustawienia - Hotkey
+    height: 20
+]])
 
-    g_ui.loadUIFromString([[
-    HotkeyEntry < Panel
-      height: 40
-      margin-top: 2
-      background-color: #00000022
-      
-      CheckBox
-        id: state
-        anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-        width: 20
-        margin-left: 5
-        !tooltip: tr('Wlacz/Wylacz ten hotkey')
+g_ui.loadUIFromString([[
+HotkeyEntry < Panel
+  height: 40
+  margin-top: 2
+  background-color: #00000022
+  
+  CheckBox
+    id: state
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    width: 20
+    margin-left: 5
+    !tooltip: tr('Wlacz/Wylacz ten hotkey')
 
-      Label
-        id: lbl
-        anchors.left: prev.right
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        font: verdana-11px-rounded
-        text-align: left
-        text-offset: 5 0
-        margin-left: 5
-        width: 110
+  Label
+    id: lbl
+    anchors.left: prev.right
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    font: verdana-11px-rounded
+    text-align: left
+    text-offset: 5 0
+    margin-left: 5
+    width: 110
 
-      TextEdit
-        id: key
-        anchors.left: prev.right
-        anchors.verticalCenter: parent.verticalCenter
-        width: 80
-        height: 20
-        text-align: center
+  TextEdit
+    id: key
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 80
+    height: 20
+    text-align: center
 
-      CheckBox
-        id: block
-        anchors.left: prev.right
-        anchors.verticalCenter: parent.verticalCenter
-        margin-left: 10
-        text: Chat Block
-        width: 80
-        font: verdana-11px-rounded
-        !tooltip: tr('ZAZNACZONE: Hotkey NIE dziala gdy piszesz na czacie.\nODZNACZONE: Hotkey dziala ZAWSZE.')
+  CheckBox
+    id: block
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 10
+    text: Chat Block
+    width: 80
+    font: verdana-11px-rounded
+    !tooltip: tr('ZAZNACZONE: Hotkey NIE dziala gdy piszesz na czacie.\nODZNACZONE: Hotkey dziala ZAWSZE.')
 
-    HotkeyProWindow < MainWindow
-      id: HotkeyProWindow_Unique
-      !text: tr('Ustawienia - Hotkey')
-      size: 380 400
-      @onEscape: self:hide()
+HotkeyProWindow < MainWindow
+  id: HotkeyProWindow_Unique
+  !text: tr('Ustawienia - Hotkey')
+  size: 380 400
+  @onEscape: self:hide()
 
-      Label
-        id: infoLabel
-        text: Zaznacz 'v' po lewej aby AKTYWOWAC hotkey.
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        text-align: center
-        font: verdana-11px-rounded
-        color: #e0e0e0
-        margin-top: 2
+  Label
+    id: infoLabel
+    text: Zaznacz 'v' po lewej aby AKTYWOWAC hotkey.
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: center
+    font: verdana-11px-rounded
+    color: #e0e0e0
+    margin-top: 2
 
-      ScrollablePanel
-        id: content
-        anchors.top: infoLabel.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: separator.top
-        vertical-scrollbar: scrollbar
-        margin-bottom: 5
-        margin-top: 8
-        layout:
-          type: verticalBox
-          spacing: 1
+  ScrollablePanel
+    id: content
+    anchors.top: infoLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: separator.top
+    vertical-scrollbar: scrollbar
+    margin-bottom: 5
+    margin-top: 8
+    layout:
+      type: verticalBox
+      spacing: 1
 
-      VerticalScrollBar
-        id: scrollbar
-        anchors.top: content.top
-        anchors.bottom: content.bottom
-        anchors.right: content.right
-        step: 14
-        pixels-scroll: true
+  VerticalScrollBar
+    id: scrollbar
+    anchors.top: content.top
+    anchors.bottom: content.bottom
+    anchors.right: content.right
+    step: 14
+    pixels-scroll: true
 
-      HorizontalSeparator
-        id: separator
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: closeBtn.top
-        margin-bottom: 8
+  HorizontalSeparator
+    id: separator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: closeBtn.top
+    margin-bottom: 8
 
-      Button
-        id: closeBtn
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        text: Close
-        width: 60
-    ]])
+  Button
+    id: closeBtn
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    text: Close
+    width: 60
+]])
 
     if rootWidget then
         local hWindow = UI.createWidget('HotkeyProWindow', rootWidget)
@@ -1552,188 +1544,188 @@ schedule(200, function()
     UI.Separator()
 
     g_ui.loadUIFromString([[
-    ScriptConfigRow < Panel
-      height: 24
-      margin-top: 2
-      background-color: #00000020
+ScriptConfigRow < Panel
+  height: 24
+  margin-top: 2
+  background-color: #00000020
 
-      Label
-        id: lblName
-        anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-        width: 100
-        text-align: left
-        text-offset: 5 0
-        font: verdana-11px-rounded
+  Label
+    id: lblName
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    width: 100
+    text-align: left
+    text-offset: 5 0
+    font: verdana-11px-rounded
 
-      CheckBox
-        id: checkShow
-        anchors.left: prev.right
-        anchors.verticalCenter: parent.verticalCenter
-        width: 60
-        text: Panel
-        font: verdana-11px-rounded
+  CheckBox
+    id: checkShow
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 60
+    text: Panel
+    font: verdana-11px-rounded
 
-      CheckBox
-        id: checkIcon
-        anchors.left: prev.right
-        anchors.verticalCenter: parent.verticalCenter
-        width: 60
-        text: Icon
-        font: verdana-11px-rounded
+  CheckBox
+    id: checkIcon
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 60
+    text: Icon
+    font: verdana-11px-rounded
 
-      Label
-        text: Txt:
-        anchors.left: prev.right
-        anchors.verticalCenter: parent.verticalCenter
-        width: 25
-        font: verdana-11px-rounded
+  Label
+    text: Txt:
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 25
+    font: verdana-11px-rounded
 
-      TextEdit
-        id: txtIconText
-        anchors.left: prev.right
-        anchors.verticalCenter: parent.verticalCenter
-        width: 95
-        height: 18
-        font: verdana-11px-rounded
-        text-align: center
+  TextEdit
+    id: txtIconText
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 95
+    height: 18
+    font: verdana-11px-rounded
+    text-align: center
 
-      Label
-        text: ID:
-        anchors.left: prev.right
-        anchors.verticalCenter: parent.verticalCenter
-        width: 20
-        font: verdana-11px-rounded
+  Label
+    text: ID:
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 20
+    font: verdana-11px-rounded
 
-      TextEdit
-        id: txtId
-        anchors.left: prev.right
-        anchors.verticalCenter: parent.verticalCenter
-        width: 40
-        height: 18
-        font: verdana-11px-rounded
-        text-align: center
+  TextEdit
+    id: txtId
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 40
+    height: 18
+    font: verdana-11px-rounded
+    text-align: center
 
-    BlessSetupWindow < MainWindow
-      id: BlessSetupWindow_Unique
-      !text: tr('Ustawienia - Skrypty')
-      size: 460 430
-      @onEscape: self:hide()
+BlessSetupWindow < MainWindow
+  id: BlessSetupWindow_Unique
+  !text: tr('Ustawienia - Skrypty')
+  size: 460 430
+  @onEscape: self:hide()
 
-      Label
-        text: Wybierz tryb wyswietlania (Ikona LUB Panel)
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        text-align: center
-        font: verdana-11px-rounded
-        margin-bottom: 5
+  Label
+    text: Wybierz tryb wyswietlania (Ikona LUB Panel)
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: center
+    font: verdana-11px-rounded
+    margin-bottom: 5
 
-      ScrollablePanel
-        id: contentList
-        anchors.top: prev.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: sep1.top
-        margin-bottom: 5
-        vertical-scrollbar: scrollbar
-        layout:
-          type: verticalBox
+  ScrollablePanel
+    id: contentList
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: sep1.top
+    margin-bottom: 5
+    vertical-scrollbar: scrollbar
+    layout:
+      type: verticalBox
 
-      VerticalScrollBar
-        id: scrollbar
-        anchors.top: contentList.top
-        anchors.bottom: contentList.bottom
-        anchors.right: contentList.right
-        step: 14
-        pixels-scroll: true
+  VerticalScrollBar
+    id: scrollbar
+    anchors.top: contentList.top
+    anchors.bottom: contentList.bottom
+    anchors.right: contentList.right
+    step: 14
+    pixels-scroll: true
 
-      HorizontalSeparator
-        id: sep1
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: lblMw.top
-        margin-bottom: 10
+  HorizontalSeparator
+    id: sep1
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: lblMw.top
+    margin-bottom: 10
 
-      Label
-        id: lblMw
-        text: MW Hotkey:  
-        anchors.left: parent.left
-        anchors.bottom: lblWg.top
-        margin-bottom: 8
-        font: verdana-11px-rounded
-        width: 70
+  Label
+    id: lblMw
+    text: MW Hotkey:  
+    anchors.left: parent.left
+    anchors.bottom: lblWg.top
+    margin-bottom: 8
+    font: verdana-11px-rounded
+    width: 70
 
-      TextEdit
-        id: txtMw
-        anchors.left: prev.right
-        anchors.verticalCenter: lblMw.verticalCenter
-        width: 80
-        height: 20
-        text-align: center
-        font: verdana-11px-rounded
+  TextEdit
+    id: txtMw
+    anchors.left: prev.right
+    anchors.verticalCenter: lblMw.verticalCenter
+    width: 80
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
 
-      Label
-        id: lblSsaBp
-        text: SSA BP ID:
-        anchors.left: txtMw.right
-        anchors.verticalCenter: lblMw.verticalCenter
-        margin-left: 20
-        font: verdana-11px-rounded
-        width: 70
+  Label
+    id: lblSsaBp
+    text: SSA BP ID:
+    anchors.left: txtMw.right
+    anchors.verticalCenter: lblMw.verticalCenter
+    margin-left: 20
+    font: verdana-11px-rounded
+    width: 70
 
-      TextEdit
-        id: txtSsaBp
-        anchors.left: prev.right
-        anchors.verticalCenter: lblMw.verticalCenter
-        width: 50
-        height: 20
-        text-align: center
-        font: verdana-11px-rounded
+  TextEdit
+    id: txtSsaBp
+    anchors.left: prev.right
+    anchors.verticalCenter: lblMw.verticalCenter
+    width: 50
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
 
-      Label
-        id: lblWg
-        text: WG Hotkey:
-        anchors.left: parent.left
-        anchors.bottom: closeBtn.top
-        margin-bottom: 12
-        font: verdana-11px-rounded
-        width: 70
+  Label
+    id: lblWg
+    text: WG Hotkey:
+    anchors.left: parent.left
+    anchors.bottom: closeBtn.top
+    margin-bottom: 12
+    font: verdana-11px-rounded
+    width: 70
 
-      TextEdit
-        id: txtWg
-        anchors.left: prev.right
-        anchors.verticalCenter: lblWg.verticalCenter
-        width: 80
-        height: 20
-        text-align: center
-        font: verdana-11px-rounded
+  TextEdit
+    id: txtWg
+    anchors.left: prev.right
+    anchors.verticalCenter: lblWg.verticalCenter
+    width: 80
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
 
-      Label
-        id: lblMrBp
-        text: MR BP ID:
-        anchors.left: txtWg.right
-        anchors.verticalCenter: lblWg.verticalCenter
-        margin-left: 20
-        font: verdana-11px-rounded
-        width: 70
+  Label
+    id: lblMrBp
+    text: MR BP ID:
+    anchors.left: txtWg.right
+    anchors.verticalCenter: lblWg.verticalCenter
+    margin-left: 20
+    font: verdana-11px-rounded
+    width: 70
 
-      TextEdit
-        id: txtMrBp
-        anchors.left: prev.right
-        anchors.verticalCenter: lblWg.verticalCenter
-        width: 50
-        height: 20
-        text-align: center
-        font: verdana-11px-rounded
+  TextEdit
+    id: txtMrBp
+    anchors.left: prev.right
+    anchors.verticalCenter: lblWg.verticalCenter
+    width: 50
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
 
-      Button
-        id: closeBtn
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        text: Zamknij (Przeladuj)
-        width: 120
-    ]])
+  Button
+    id: closeBtn
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    text: Zamknij (Przeladuj)
+    width: 120
+]])
 
     local setupWindow
     if rootWidget then
@@ -1797,13 +1789,13 @@ schedule(200, function()
     end)
 
     -- GŁÓWNY PANEL Z WPISANYM ID W DEFINICJĘ
-    local mainPanel = setupUI([[
-    Panel
-      id: GuildBot_Main_Panel_V15
-      layout:
-        type: verticalBox
-        fit-children: true
-    ]])
+local mainPanel = setupUI([[
+Panel
+  id: GuildBot_Main_Panel_V15
+  layout:
+    type: verticalBox
+    fit-children: true
+]])
 
     local activeWidgets = {}
 
@@ -1899,47 +1891,46 @@ schedule(200, function()
     paralLabel:hide()
     paralLabel:setHeight(0)
 
-    -- Definicja UI
-    local ui = setupUI([[
-    Panel
-      id: GuildBot_Paral_UI_V15
-      height: 85
+local ui = setupUI([[
+Panel
+  id: GuildBot_Paral_UI_V15
+  height: 85
 
-      Button
-        id: editListBtn
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
-        text: Manual Enemy List
-        height: 20
-        margin-bottom: 5
-        font: verdana-11px-rounded
+  Button
+    id: editListBtn
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text: Manual Enemy List
+    height: 20
+    margin-bottom: 5
+    font: verdana-11px-rounded
 
-      CheckBox
-        id: magicProfessionCheckBox
-        anchors.top: prev.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        text-align: left
-        !text: tr('Paral Mages Only')
-        margin-top: 5
+  CheckBox
+    id: magicProfessionCheckBox
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: left
+    !text: tr('Paral Mages Only')
+    margin-top: 5
 
-      CheckBox
-        id: skullOnlyCheckBox
-        anchors.top: prev.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        text-align: left
-        !text: tr('Paral Skull Only')
+  CheckBox
+    id: skullOnlyCheckBox
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: left
+    !text: tr('Paral Skull Only')
 
-      CheckBox
-        id: canShootOnlyCheckBox
-        anchors.top: prev.bottom
-        anchors.left: parent.left
-        anchors.right: parent.right
-        text-align: left
-        !text: tr('CanShoot Only')
-    ]])
+  CheckBox
+    id: canShootOnlyCheckBox
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: left
+    !text: tr('CanShoot Only')
+]])
 
     ui:hide()
     ui:setHeight(0)
