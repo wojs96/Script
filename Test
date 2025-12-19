@@ -1,64 +1,49 @@
--- Generujemy unikalny token dla TEJ instancji
+-- Generujemy unikalny token dla TEJ KONKRETNEJ instancji skryptu
 local INSTANCE_ID = os.time() .. "_" .. math.random(10000, 99999)
 storage.CurrentScriptToken = INSTANCE_ID
 
--- --- ZABEZPIECZENIE PRZED "WRAPPINGIEM WRAPPERA" ---
--- Zapisujemy oryginalne funkcje systemowe tylko RAZ
-if not storage.SystemCallbacks then
-    storage.SystemCallbacks = {
-        onKeyPress = onKeyPress,
-        onKeyDown = onKeyDown,
-        onKeyUp = onKeyUp,
-        onTalk = onTalk,
-        onTextMessage = onTextMessage,
-        onPlayerPositionChange = onPlayerPositionChange,
-        onCreatureAppear = onCreatureAppear,
-        macro = macro
-    }
+-- Funkcja sprawdzająca czy ta wersja skryptu jest aktualna
+-- Jeśli skrypt zostanie przeładowany, token w storage się zmieni, a ta funkcja zwróci false dla starej wersji
+local function amIAlive()
+    return storage.CurrentScriptToken == INSTANCE_ID
 end
-
--- Przywracamy czyste funkcje
-if storage.SystemCallbacks.onKeyPress then onKeyPress = storage.SystemCallbacks.onKeyPress end
-if storage.SystemCallbacks.onKeyDown then onKeyDown = storage.SystemCallbacks.onKeyDown end
-if storage.SystemCallbacks.onKeyUp then onKeyUp = storage.SystemCallbacks.onKeyUp end
-if storage.SystemCallbacks.onTalk then onTalk = storage.SystemCallbacks.onTalk end
-if storage.SystemCallbacks.onTextMessage then onTextMessage = storage.SystemCallbacks.onTextMessage end
-if storage.SystemCallbacks.onPlayerPositionChange then onPlayerPositionChange = storage.SystemCallbacks.onPlayerPositionChange end
-if storage.SystemCallbacks.onCreatureAppear then onCreatureAppear = storage.SystemCallbacks.onCreatureAppear end
-if storage.SystemCallbacks.macro then macro = storage.SystemCallbacks.macro end
-
 
 -- --- FUNKCJA CZYSTKI (KILL EVERYTHING) ---
 local function KILL_EVERYTHING()
     local root = g_ui.getRootWidget()
     if not root then return end
-
+    
+    -- 1. Usuwanie Głównego Panelu i okien pomocniczych
     local idsToRemove = {
         "GuildBot_Main_Panel_V15",
-        "GuildBot_Paral_UI_V15", 
-        "GuildBot_Overlay_Info",
         "BlessSetupWindow_Unique",
         "HotkeyProWindow_Unique",
+        "GuildBot_Paral_UI_V15",
         "GuildBot_Paral_Label",
+        "GuildBot_Overlay_Info",
         "BotSwitch"
     }
-
+    
     for _, id in ipairs(idsToRemove) do
         local widget = root:recursiveGetChildById(id)
         if widget then widget:destroy() end
     end
 
+    -- 2. Usuwanie Ikon z TopMenu (Kluczowe dla naprawy ikon)
     if modules.client_topmenu then
         local topMenu = modules.client_topmenu.getTopMenu()
         if topMenu then
             local children = topMenu:getChildren()
             if children then
+                -- Lecimy od końca, żeby bezpiecznie usuwać
                 for i = #children, 1, -1 do
                     local child = children[i]
-                    if child:getId():find("GuildBot_Icon") or 
-                       child:getId() == "autoParalRunaIcon" or 
-                       child:getId() == "autoParalBombaIcon" then
-                        child:destroy()
+                    if child then
+                        local id = child:getId()
+                        -- Usuwamy wszystko co wygląda na naszą ikonę
+                        if id and (string.find(id, "GuildBot_Icon") or id == "autoParalRunaIcon" or id == "autoParalBombaIcon") then
+                            child:destroy()
+                        end
                     end
                 end
             end
@@ -66,54 +51,26 @@ local function KILL_EVERYTHING()
     end
 end
 
+-- Wykonaj czystkę PRZED załadowaniem nowej logiki
 KILL_EVERYTHING()
 
-schedule(100, function()
-    if storage.CurrentScriptToken ~= INSTANCE_ID then return end
-
-    local function amIAlive()
-        return storage.CurrentScriptToken == INSTANCE_ID
-    end
+-- Opóźnienie startu (niezbędne, aby UI zdążyło się odświeżyć)
+schedule(50, function()
+    -- Jeśli w międzyczasie załadowano kolejną wersję, ta nie startuje
+    if not amIAlive() then return end
 
     local function Main()
-        -- --- NOWE WRAPPERY ---
-        local function wrap(originalFunc)
-            return function(callback)
-                if originalFunc then
-                    originalFunc(function(...)
-                        if not amIAlive() then return end
-                        return callback(...)
-                    end)
-                end
-            end
-        end
-
-        local function wrapMacro(originalMacro)
-            return function(delay, funcOrName, func)
-                local callback = func
-                if type(funcOrName) == "function" then callback = funcOrName end
-                local safeCallback = function()
-                    if not amIAlive() then return end
-                    if callback then callback() end
-                end
-                if type(funcOrName) == "string" then return originalMacro(delay, funcOrName, safeCallback)
-                else return originalMacro(delay, safeCallback) end
-            end
-        end
-
-        onKeyPress = wrap(onKeyPress)
-        onKeyDown = wrap(onKeyDown)
-        onKeyUp = wrap(onKeyUp)
-        onTalk = wrap(onTalk)
-        onTextMessage = wrap(onTextMessage)
-        onPlayerPositionChange = wrap(onPlayerPositionChange)
-        onCreatureAppear = wrap(onCreatureAppear)
-        macro = wrapMacro(macro)
         
-        local _setupUI = setupUI
-        setupUI = function(def, parent) return _setupUI(def, parent) end
+        -- --- LISTENERY KLAWISZY (Naprawa Dasha i Hotkeyów) ---
+        -- Definiujemy je lokalnie dla Main, ale przypisujemy do globalnych zmiennych.
+        -- amIAlive() gwarantuje, że działa tylko najnowsza wersja.
 
-        -- --- KONFIGURACJA PODSTAWOWA ---
+        local function safeOnKeyPress(keys)
+            if not amIAlive() then return end
+            -- Logika zostanie wstrzyknięta później, to tylko placeholder
+        end
+
+        -- --- CONFIG ---
         setDefaultTab("Guild")
         local webhook = "https://discord.com/api/webhooks/1449165581298176190/ARG3L_FjY_MuAoyYaGA8rnQyR8v62yr0PSjCCMXDjk3qofxeY6BlSMAj_ehGmnVzfJGq"
 
@@ -172,6 +129,7 @@ schedule(100, function()
         end
 
         onTalk(function(name, level, mode, text, channelId, pos)
+            if not amIAlive() then return end
             if type(text) ~= "string" then return end
             if (mode == 7 or mode == 8 or mode == 13) and channelId == 0 then
                 addGuildMessageToDefault(name, level, text, false)
@@ -179,6 +137,7 @@ schedule(100, function()
         end)
 
         onTextMessage(function(mode, text)
+            if not amIAlive() then return end
             if mode == 17 and text:find("%[Guild:") then
                 local guild, rank, msg = text:match("%[Guild:%s*(.-)%]%s*(.-)%:%s*(.*)")
                 local name = rank or "Guild"
@@ -258,7 +217,6 @@ schedule(100, function()
 
         -- --- HOTKEYS CONFIG ---
         local hotkeyPanelName = "hotkeysManager"
-        -- Inicjalizacja tabeli, jesli nie istnieje
         if type(storage[hotkeyPanelName]) ~= "table" then
             storage[hotkeyPanelName] = {}
         end
@@ -279,14 +237,11 @@ schedule(100, function()
             { id = "walk",    name = "Dash MW",               default = "R" }
         }
 
-        local dirty = false
         for _, item in ipairs(hotkeyList) do
-            if hConfig[item.id .. "Key"] == nil then hConfig[item.id .. "Key"] = item.default dirty = true end
-            if hConfig[item.id .. "Block"] == nil then hConfig[item.id .. "Block"] = true dirty = true end
-            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = false dirty = true end
+            if hConfig[item.id .. "Key"] == nil then hConfig[item.id .. "Key"] = item.default end
+            if hConfig[item.id .. "Block"] == nil then hConfig[item.id .. "Block"] = true end
+            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = true end
         end
-        -- Jesli cos zmienilismy w domyslnych, wymuszamy zapis
-        if dirty then storage[hotkeyPanelName] = hConfig end
 
         local panelName = "scriptManager" 
         if type(storage[panelName]) ~= "table" then
@@ -369,6 +324,8 @@ schedule(100, function()
                         g_game.open(nextBackpack, foundContainer) delay(200)
                     elseif itemCount == 0 and foundBackpack then
                         backtrackingMR = true g_game.openParent(foundContainer) delay(200)
+                    elseif itemCount == 0 and foundBackpack then
+                        backtrackingMR = true g_game.openParent(foundContainer) delay(200)
                     elseif itemCount == 0 and not foundBackpack then
                         backtrackingMR = true g_game.openParent(foundContainer) delay(200)
                     end
@@ -393,7 +350,10 @@ schedule(100, function()
         end)
 
         local extrablessflag = false
-        onTextMessage(function(mode, text) if text:find("Masz juz extra blessy.") then extrablessflag = true end end)
+        onTextMessage(function(mode, text) 
+            if not amIAlive() then return end
+            if text:find("Masz juz extra blessy.") then extrablessflag = true end 
+        end)
         local ExtraBlessMacro = macro(1000, function() if not amIAlive() then return end if not extrablessflag and findItem(6561) then use(6561) end end)
         local AntyRSMacro = macro(10, function() if not amIAlive() then return end if player:getSkull() == 4 then use(8148) end end)
 
@@ -489,6 +449,7 @@ schedule(100, function()
         end)
         
         onKeyDown(function(keys)
+            if not amIAlive() then return end -- FIX DASH/HOTKEYS
             if not HoldMwallMacro.isOn() or modules.game_console.isChatEnabled() then return end
             if keys == config.holdMwKey or keys == config.holdWgKey then
                 local tile = getTileUnderCursor()
@@ -529,10 +490,11 @@ schedule(100, function()
             if originalFloorSetOff then originalFloorSetOff(self) end
         end
         onPlayerPositionChange(function(pos)
-        if FloorLockMacro.isOn() then
-        local gameMapPanel = modules.game_interface.getMapPanel()
-        if gameMapPanel then gameMapPanel:lockVisibleFloor(pos.z) end
-        end
+            if not amIAlive() then return end -- FIX DASH/HOTKEYS
+            if FloorLockMacro.isOn() then
+                local gameMapPanel = modules.game_interface.getMapPanel()
+                if gameMapPanel then gameMapPanel:lockVisibleFloor(pos.z) end
+            end
         end)
 
         local scriptsList = {
@@ -551,8 +513,8 @@ schedule(100, function()
             { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" },
         }
 
-        -- --- VOCATION CHECK FIX (ZAPISYWANIE W STORAGE) ---
-        local myVocation = storage.mySavedVocation
+        -- --- VOCATION CHECK FIX (Check once, save to storage) ---
+        local myVocation = storage.mySavedVocation -- Wczytujemy z pamieci jesli jest
         local vocationRegex = [[You see yourself. You are an? (.-)%.]]
         local vocationCheckCount = 0
 
@@ -560,38 +522,38 @@ schedule(100, function()
             if not amIAlive() then return end
             if myVocation then return end
             
-            -- Jesli juz mamy to w storage, uzywamy i nie sprawdzamy
+            -- Jesli mamy w storage, uzywamy od razu
             if storage.mySavedVocation then
                 myVocation = storage.mySavedVocation
                 return
             end
             
-            if vocationCheckCount > 3 then return end 
+            if vocationCheckCount > 5 then return end 
             vocationCheckCount = vocationCheckCount + 1
             
             g_game.look(player)
-            schedule(3000, checkMyVocation)
+            schedule(2000, checkMyVocation)
         end
-        
         onTextMessage(function(mode, text)
+            if not amIAlive() then return end
             local vocation = text:match(vocationRegex)
             if vocation then
                 local lv = vocation:lower()
-                local detected = "Unknown"
-                if lv:find("sorcerer") then detected = "MS"
-                elseif lv:find("druid") then detected = "ED"
-                elseif lv:find("knight") then detected = "EK"
-                elseif lv:find("paladin") then detected = "RP"
-                end
+                if lv:find("master sorcerer") then myVocation = "MS"
+                elseif lv:find("elder druid") then myVocation = "ED"
+                elseif lv:find("elite knight") then myVocation = "EK"
+                elseif lv:find("royal paladin") then myVocation = "RP"
+                else myVocation = "Unknown" end
                 
-                if detected ~= "Unknown" then
-                    myVocation = detected
-                    storage.mySavedVocation = detected -- Zapisz do storage
+                -- Zapisujemy do storage, zeby nie spamowac przy nastepnym reloadzie
+                if myVocation ~= "Unknown" then
+                    storage.mySavedVocation = myVocation
                 end
             end
         end)
         
-        if not myVocation then
+        -- Uruchom sprawdzanie tylko jesli nie mamy wczytanego
+        if not storage.mySavedVocation then
             checkMyVocation()
         end
 
@@ -618,6 +580,7 @@ schedule(100, function()
         end)
 
         onTalk(function(name, _, mode, text)
+            if not amIAlive() then return end
             if not guildhealing.isOn() then return end
             if text == "Mam mniej niz 75 procent many!" then
                 local myPos = player:getPosition()
@@ -828,6 +791,7 @@ schedule(100, function()
         end)
 
         onCreatureAppear(function(creature)
+            if not amIAlive() then return end
             if not recognizeMacro.isOn() then return end
             if not creature or not creature:isPlayer() then
                 return
@@ -880,6 +844,7 @@ schedule(100, function()
         end
 
         onTalk(function(name, _, mode, text)
+            if not amIAlive() then return end
             if not recognizeMacro.isOn() then return end
             local testTargetName = text:match("trgt:%s*([^\n]+)")
             local cancelTarget = text:match("stop target")
@@ -930,6 +895,7 @@ Panel
 
         local guildWidget = setupUI([[
 Label
+  id: GuildBot_Guild_Label
   color: green
   font: verdana-11px-rounded
   height: 12
@@ -942,6 +908,7 @@ Label
 
         local enemyWidget = setupUI([[
 Label
+  id: GuildBot_Enemy_Label
   color: red
   font: verdana-11px-rounded
   height: 12
@@ -1180,20 +1147,18 @@ HotkeyProWindow < MainWindow
                 entry.block:setChecked(blockVal)
 
                 local enabledVal = hConfig[item.id .. "Enabled"]
-                if enabledVal == nil then enabledVal = false end -- DOMYSLNIE OFF
+                if enabledVal == nil then enabledVal = true end
                 entry.state:setChecked(enabledVal)
                 entry.state:setTooltip(enabledVal and "Status: ON" or "Status: OFF")
 
                 entry.key.onTextChange = function(widget, text)
                     hConfig[item.id .. "Key"] = text
-                    storage[hotkeyPanelName] = hConfig -- FORCE SAVE
                 end
 
                 entry.block.onClick = function(widget)
                     local keyName = item.id .. "Block"
                     hConfig[keyName] = not hConfig[keyName]
                     widget:setChecked(hConfig[keyName])
-                    storage[hotkeyPanelName] = hConfig -- FORCE SAVE
                 end
 
                 entry.state.onClick = function(widget)
@@ -1201,7 +1166,6 @@ HotkeyProWindow < MainWindow
                     hConfig[keyName] = not hConfig[keyName]
                     widget:setChecked(hConfig[keyName])
                     widget:setTooltip(hConfig[keyName] and "Status: ON" or "Status: OFF")
-                    storage[hotkeyPanelName] = hConfig -- FORCE SAVE
                 end
             end
 
@@ -1240,6 +1204,7 @@ HotkeyProWindow < MainWindow
         end)
 
         onPlayerPositionChange(function(newPos, oldPos)
+            if not amIAlive() then return end
             local idx = findWalkIndex(newPos)
             if idx then
                 local tile = g_map.getTile(newPos)
@@ -1249,6 +1214,7 @@ HotkeyProWindow < MainWindow
         end)
 
         onKeyPress(function(keys)
+            if not amIAlive() then return end
             if keys == hConfig.walkKey then
                 if lastWalkKeyTime - now < -500 then
                     for _, tile in ipairs(g_map.getTiles(posz())) do
@@ -1262,6 +1228,7 @@ HotkeyProWindow < MainWindow
         end)
 
         onKeyPress(function(keys)
+            if not amIAlive() then return end -- FIX DLA DASHA
             local player = g_game.getLocalPlayer()
             if not player then return end
             local isChatting = modules.game_console and modules.game_console.isChatEnabled()
@@ -1603,7 +1570,6 @@ BlessSetupWindow < MainWindow
                 row.checkShow.onClick = function(w)
                     local newState = not config[showKey]
                     config[showKey] = newState
-                    storage[panelName] = config -- FORCE SAVE
                     w:setChecked(newState)
                     if newState then
                         config[iconKey] = false
@@ -1613,7 +1579,6 @@ BlessSetupWindow < MainWindow
                 row.checkIcon.onClick = function(w)
                     local newState = not config[iconKey]
                     config[iconKey] = newState
-                    storage[panelName] = config -- FORCE SAVE
                     w:setChecked(newState)
                     if newState then
                         config[showKey] = false
@@ -1622,19 +1587,19 @@ BlessSetupWindow < MainWindow
                 end
                 
                 row.txtIconText:setText(config["text"..script.key] or script.defaultText)
-                row.txtIconText.onTextChange = function(w, t) config["text"..script.key] = t storage[panelName] = config end
+                row.txtIconText.onTextChange = function(w, t) config["text"..script.key] = t end
                 row.txtId:setText(config["id"..script.key] or script.defaultId)
-                row.txtId.onTextChange = function(w, t) config["id"..script.key] = tonumber(t) or script.defaultId storage[panelName] = config end
+                row.txtId.onTextChange = function(w, t) config["id"..script.key] = tonumber(t) or script.defaultId end
             end
             
             sWindow.txtMw:setText(config.holdMwKey or "F11")
-            sWindow.txtMw.onTextChange = function(w, text) config.holdMwKey = text storage[panelName] = config end
+            sWindow.txtMw.onTextChange = function(w, text) config.holdMwKey = text end
             sWindow.txtWg:setText(config.holdWgKey or "F12")
-            sWindow.txtWg.onTextChange = function(w, text) config.holdWgKey = text storage[panelName] = config end
+            sWindow.txtWg.onTextChange = function(w, text) config.holdWgKey = text end
             sWindow.txtSsaBp:setText(config.contSsaId or 2869)
-            sWindow.txtSsaBp.onTextChange = function(w, text) if tonumber(text) then config.contSsaId = tonumber(text) storage[panelName] = config end end
+            sWindow.txtSsaBp.onTextChange = function(w, text) if tonumber(text) then config.contSsaId = tonumber(text) end end
             sWindow.txtMrBp:setText(config.contMrId or 2866)
-            sWindow.txtMrBp.onTextChange = function(w, text) if tonumber(text) then config.contMrId = tonumber(text) storage[panelName] = config end end
+            sWindow.txtMrBp.onTextChange = function(w, text) if tonumber(text) then config.contMrId = tonumber(text) end end
             
             sWindow.txtCmd:setText(storage.commander or "Gladiator")
             sWindow.txtCmd.onTextChange = function(widget, newText)
@@ -1659,13 +1624,14 @@ BlessSetupWindow < MainWindow
                 local showPanel = config["show" .. s.key]
                 local showIcon = config["icon" .. s.key]
                 
+                -- --- FIX IKON: NADAWANIE UNIKALNEGO ID DLA CZYSZCZENIA ---
                 if showIcon then
                     local itemId = config["id" .. s.key] or s.defaultId
                     local txt = config["text" .. s.key] or s.defaultText
                     local icon = addIcon(s.label, {item = {id = itemId}, text = txt, movable = true}, function(ic)
                         s.macro.toggle() 
                     end)
-                    -- ID dla ikony
+                    -- Ustawiamy ID, dzieki czemu KILL_EVERYTHING moze je usunac przy reloadzie
                     icon:setId("GuildBot_Icon_" .. s.key)
                     activeWidgets[s.key] = icon
                 
@@ -1715,10 +1681,7 @@ BlessSetupWindow < MainWindow
             for _, s in ipairs(scriptsList) do
                 if s.macro then
                     local on = s.macro.isOn()
-                    if config["state"..s.key] ~= on then 
-                        config["state"..s.key] = on 
-                        storage[panelName] = config -- FORCE SAVE STATE
-                    end
+                    if config["state"..s.key] ~= on then config["state"..s.key] = on end
                     local w = activeWidgets[s.key]
                     if w then
                         local won = false
@@ -1959,11 +1922,11 @@ Panel
             local editWin = UI.MultilineEditorWindow(storage.enemyList or "", {title="Enemy List"}, function(t) storage.enemyList = t end)
         end
         paralUI.magicProfessionCheckBox:setChecked(config.magicProfessionOnly)
-        paralUI.magicProfessionCheckBox.onCheckChange = function(self, c) config.magicProfessionOnly = c storage[panelName] = config end
+        paralUI.magicProfessionCheckBox.onCheckChange = function(self, c) config.magicProfessionOnly = c end
         paralUI.skullOnlyCheckBox:setChecked(config.skullOnly)
-        paralUI.skullOnlyCheckBox.onCheckChange = function(self, c) config.skullOnly = c storage[panelName] = config end
+        paralUI.skullOnlyCheckBox.onCheckChange = function(self, c) config.skullOnly = c end
         paralUI.canShootOnlyCheckBox:setChecked(config.canShootOnly)
-        paralUI.canShootOnlyCheckBox.onCheckChange = function(self, c) config.canShootOnly = c storage[panelName] = config end
+        paralUI.canShootOnlyCheckBox.onCheckChange = function(self, c) config.canShootOnly = c end
 
         local runeIcon = addIcon("autoParalRunaIcon", {item=3165, text="Runa", movable=true}, function(icon) if myVocation == "ED" then AutoParalRuneMacro.toggle() end end)
         if runeIcon then runeIcon:hide() end
