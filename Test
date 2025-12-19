@@ -2,21 +2,48 @@
 local INSTANCE_ID = os.time() .. "_" .. math.random(10000, 99999)
 storage.CurrentScriptToken = INSTANCE_ID
 
+-- --- ZABEZPIECZENIE PRZED "WRAPPINGIEM WRAPPERA" ---
+-- Zapisujemy oryginalne funkcje systemowe tylko RAZ, zeby ich nie psuc przy reloadzie
+if not storage.SystemCallbacks then
+    storage.SystemCallbacks = {
+        onKeyPress = onKeyPress,
+        onKeyDown = onKeyDown,
+        onKeyUp = onKeyUp,
+        onTalk = onTalk,
+        onTextMessage = onTextMessage,
+        onPlayerPositionChange = onPlayerPositionChange,
+        onCreatureAppear = onCreatureAppear,
+        macro = macro
+    }
+end
+
+-- Przywracamy czyste funkcje systemowe przed rozpoczeciem (naprawia problem z niedzialajacymi hotkeyami)
+if storage.SystemCallbacks.onKeyPress then onKeyPress = storage.SystemCallbacks.onKeyPress end
+if storage.SystemCallbacks.onKeyDown then onKeyDown = storage.SystemCallbacks.onKeyDown end
+if storage.SystemCallbacks.onKeyUp then onKeyUp = storage.SystemCallbacks.onKeyUp end
+if storage.SystemCallbacks.onTalk then onTalk = storage.SystemCallbacks.onTalk end
+if storage.SystemCallbacks.onTextMessage then onTextMessage = storage.SystemCallbacks.onTextMessage end
+if storage.SystemCallbacks.onPlayerPositionChange then onPlayerPositionChange = storage.SystemCallbacks.onPlayerPositionChange end
+if storage.SystemCallbacks.onCreatureAppear then onCreatureAppear = storage.SystemCallbacks.onCreatureAppear end
+if storage.SystemCallbacks.macro then macro = storage.SystemCallbacks.macro end
+
+
 -- --- FUNKCJA CZYSTKI (KILL EVERYTHING) ---
 local function KILL_EVERYTHING()
     local root = g_ui.getRootWidget()
     if not root then return end
 
     local idsToRemove = {
-        "GuildBot_Main_Panel_V15", -- Główny panel
+        "GuildBot_Main_Panel_V15",
         "GuildBot_Paral_UI_V15", 
         "GuildBot_Overlay_Info",
         "BlessSetupWindow_Unique",
         "HotkeyProWindow_Unique",
-        "GuildBot_Paral_Label"
+        "GuildBot_Paral_Label",
+        "BotSwitch"
     }
 
-    -- 1. Usuwanie głównych okien po ID (Szukamy wszedzie rekurencyjnie)
+    -- 1. Usuwanie paneli (rekurencyjne szukanie)
     for _, id in ipairs(idsToRemove) do
         local widget = root:recursiveGetChildById(id)
         if widget then
@@ -24,20 +51,19 @@ local function KILL_EVERYTHING()
         end
     end
 
-    -- 2. Usuwanie ikon z TopMenu (agresywne)
+    -- 2. Usuwanie ikon z TopMenu
     if modules.client_topmenu then
         local topMenu = modules.client_topmenu.getTopMenu()
         if topMenu then
             local children = topMenu:getChildren()
-            for i = #children, 1, -1 do
-                local child = children[i]
-                -- Usuwamy ikony stworzone przez nas (zaczynajace sie od GuildBot_Icon)
-                if child:getId():find("GuildBot_Icon") then
-                    child:destroy()
-                end
-                -- Usuwamy stare ikony bez prefixu jesli istnieja
-                if child:getId() == "autoParalRunaIcon" or child:getId() == "autoParalBombaIcon" then
-                    child:destroy()
+            if children then
+                for i = #children, 1, -1 do
+                    local child = children[i]
+                    if child:getId():find("GuildBot_Icon") or 
+                       child:getId() == "autoParalRunaIcon" or 
+                       child:getId() == "autoParalBombaIcon" then
+                        child:destroy()
+                    end
                 end
             end
         end
@@ -48,7 +74,7 @@ end
 KILL_EVERYTHING()
 
 schedule(100, function()
-    -- Sprawdzamy czy ta instancja nadal jest aktualna
+    -- Sprawdzamy czy ta instancja jest aktualna
     if storage.CurrentScriptToken ~= INSTANCE_ID then return end
 
     local function amIAlive()
@@ -56,62 +82,46 @@ schedule(100, function()
     end
 
     local function Main()
-        -- --- ZMIANA PODEJSCIA DO EVENTOW (NAPRAWA DASHA I HOTKEYOW) ---
-        -- Nadpisujemy globalne funkcje bez owijania starego smiecia.
-        -- amIAlive() na poczatku gwarantuje, ze dziala tylko najnowsza wersja.
-
-        local function safeCall(func, ...)
-            if not amIAlive() then return end
-            if func then return func(...) end
-        end
-
-        -- Nadpisujemy onKeyPress (Dash, Hotkeye)
-        onKeyPress = function(keys)
-            if not amIAlive() then return end
-            -- Tutaj bedzie logika hotkeyow pozniej w kodzie, ale musimy zdefiniowac listener
-            -- Eventy beda obslugiwane przez funkcje zdefiniowane nizej w "Listeners"
-        end
+        -- --- NOWE WRAPPERY (POPRAWIONE) ---
+        -- Uzywamy oryginalnych funkcji, ale dodajemy warunek amIAlive wewnatrz callbacka.
+        -- To standardowa metoda w OTCv8, ktora nie psuje hotkeyow.
         
-        -- Inicjalizacja tablicy listenerow, zeby nie gubic referencji
-        local keyPressListeners = {}
-        local keyDownListeners = {}
-        local positionChangeListeners = {}
-        local textMessageListeners = {}
-
-        -- Nowa funkcja onKeyPress, ktora wykonuje wszystkie zarejestrowane listenery
-        onKeyPress = function(keys)
-            if not amIAlive() then return end
-            for _, listener in pairs(keyPressListeners) do
-                listener(keys)
+        local function wrap(originalFunc)
+            return function(callback)
+                if originalFunc then
+                    originalFunc(function(...)
+                        if not amIAlive() then return end
+                        return callback(...)
+                    end)
+                end
             end
         end
 
-        onKeyDown = function(keys)
-            if not amIAlive() then return end
-            for _, listener in pairs(keyDownListeners) do
-                listener(keys)
+        local function wrapMacro(originalMacro)
+            return function(delay, funcOrName, func)
+                local callback = func
+                if type(funcOrName) == "function" then callback = funcOrName end
+                local safeCallback = function()
+                    if not amIAlive() then return end
+                    if callback then callback() end
+                end
+                if type(funcOrName) == "string" then return originalMacro(delay, funcOrName, safeCallback)
+                else return originalMacro(delay, safeCallback) end
             end
         end
 
-        onPlayerPositionChange = function(newPos, oldPos)
-            if not amIAlive() then return end
-            for _, listener in pairs(positionChangeListeners) do
-                listener(newPos, oldPos)
-            end
-        end
+        -- Nadpisujemy lokalnie funkcje dla TEJ instancji Main
+        onKeyPress = wrap(onKeyPress)
+        onKeyDown = wrap(onKeyDown)
+        onKeyUp = wrap(onKeyUp)
+        onTalk = wrap(onTalk)
+        onTextMessage = wrap(onTextMessage)
+        onPlayerPositionChange = wrap(onPlayerPositionChange)
+        onCreatureAppear = wrap(onCreatureAppear)
+        macro = wrapMacro(macro)
         
-        onTextMessage = function(mode, text)
-             if not amIAlive() then return end
-             for _, listener in pairs(textMessageListeners) do
-                listener(mode, text)
-             end
-        end
-
-        -- Helpers do dodawania listenerow wewnatrz skryptu
-        local function addKeyPress(func) table.insert(keyPressListeners, func) end
-        local function addKeyDown(func) table.insert(keyDownListeners, func) end
-        local function addPosChange(func) table.insert(positionChangeListeners, func) end
-        local function addTextMsg(func) table.insert(textMessageListeners, func) end
+        local _setupUI = setupUI
+        setupUI = function(def, parent) return _setupUI(def, parent) end
 
         -- --- KONFIGURACJA PODSTAWOWA ---
         setDefaultTab("Guild")
@@ -172,14 +182,13 @@ schedule(100, function()
         end
 
         onTalk(function(name, level, mode, text, channelId, pos)
-            if not amIAlive() then return end
             if type(text) ~= "string" then return end
             if (mode == 7 or mode == 8 or mode == 13) and channelId == 0 then
                 addGuildMessageToDefault(name, level, text, false)
             end
         end)
 
-        addTextMsg(function(mode, text)
+        onTextMessage(function(mode, text)
             if mode == 17 and text:find("%[Guild:") then
                 local guild, rank, msg = text:match("%[Guild:%s*(.-)%]%s*(.-)%:%s*(.*)")
                 local name = rank or "Guild"
@@ -279,7 +288,7 @@ schedule(100, function()
             { id = "walk",    name = "Dash MW",               default = "R" }
         }
 
-        -- Domyslnie WYLACZONE jesli skrypt odpalony pierwszy raz
+        -- DOMYSLNIE WYLACZONE
         for _, item in ipairs(hotkeyList) do
             if hConfig[item.id .. "Key"] == nil then hConfig[item.id .. "Key"] = item.default end
             if hConfig[item.id .. "Block"] == nil then hConfig[item.id .. "Block"] = true end
@@ -391,7 +400,7 @@ schedule(100, function()
         end)
 
         local extrablessflag = false
-        addTextMsg(function(mode, text) if text:find("Masz juz extra blessy.") then extrablessflag = true end end)
+        onTextMessage(function(mode, text) if text:find("Masz juz extra blessy.") then extrablessflag = true end end)
         local ExtraBlessMacro = macro(1000, function() if not amIAlive() then return end if not extrablessflag and findItem(6561) then use(6561) end end)
         local AntyRSMacro = macro(10, function() if not amIAlive() then return end if player:getSkull() == 4 then use(8148) end end)
 
@@ -458,7 +467,7 @@ schedule(100, function()
         end)
 
         local targetID = nil
-        addKeyPress(function(keys) if keys == "Escape" then targetID = nil end end)
+        onKeyPress(function(keys) if keys == "Escape" then targetID = nil end end)
         local HoldTargetMacro = macro(100, function()
             if not amIAlive() then return end
             local target = g_game.getAttackingCreature()
@@ -486,7 +495,7 @@ schedule(100, function()
             end
         end)
         
-        addKeyDown(function(keys)
+        onKeyDown(function(keys)
             if not HoldMwallMacro.isOn() or modules.game_console.isChatEnabled() then return end
             if keys == config.holdMwKey or keys == config.holdWgKey then
                 local tile = getTileUnderCursor()
@@ -526,7 +535,7 @@ schedule(100, function()
             if gameMapPanel then gameMapPanel:unlockVisibleFloor() end
             if originalFloorSetOff then originalFloorSetOff(self) end
         end
-        addPosChange(function(pos)
+        onPlayerPositionChange(function(pos)
         if FloorLockMacro.isOn() then
         local gameMapPanel = modules.game_interface.getMapPanel()
         if gameMapPanel then gameMapPanel:lockVisibleFloor(pos.z) end
@@ -558,14 +567,20 @@ schedule(100, function()
             if not amIAlive() then return end
             if myVocation then return end
             
-            if vocationCheckCount > 3 then return end -- Probojemy max 3 razy jesli nie ma w storage
+            -- FIX SPAMU: Sprawdzamy czy mamy juz zapisane w storage
+            if storage.mySavedVocation then
+                myVocation = storage.mySavedVocation
+                return
+            end
+            
+            if vocationCheckCount > 3 then return end 
             vocationCheckCount = vocationCheckCount + 1
             
             g_game.look(player)
             schedule(3000, checkMyVocation)
         end
         
-        addTextMsg(function(mode, text)
+        onTextMessage(function(mode, text)
             local vocation = text:match(vocationRegex)
             if vocation then
                 local lv = vocation:lower()
@@ -1228,7 +1243,7 @@ HotkeyProWindow < MainWindow
             end
         end)
 
-        addPosChange(function(newPos, oldPos)
+        onPlayerPositionChange(function(newPos, oldPos)
             local idx = findWalkIndex(newPos)
             if idx then
                 local tile = g_map.getTile(newPos)
@@ -1237,7 +1252,7 @@ HotkeyProWindow < MainWindow
             end
         end)
 
-        addKeyPress(function(keys)
+        onKeyPress(function(keys)
             if keys == hConfig.walkKey then
                 if lastWalkKeyTime - now < -500 then
                     for _, tile in ipairs(g_map.getTiles(posz())) do
@@ -1250,7 +1265,7 @@ HotkeyProWindow < MainWindow
             end
         end)
 
-        addKeyPress(function(keys)
+        onKeyPress(function(keys)
             local player = g_game.getLocalPlayer()
             if not player then return end
             local isChatting = modules.game_console and modules.game_console.isChatEnabled()
@@ -1652,7 +1667,7 @@ BlessSetupWindow < MainWindow
                     local icon = addIcon(s.label, {item = {id = itemId}, text = txt, movable = true}, function(ic)
                         s.macro.toggle() 
                     end)
-                    -- ID dla ikony zeby dzialalo czyszczenie
+                    -- ID dla ikony
                     icon:setId("GuildBot_Icon_" .. s.key)
                     activeWidgets[s.key] = icon
                 
