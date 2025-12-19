@@ -1,51 +1,68 @@
-
 -- Generujemy unikalny token dla TEJ KONKRETNEJ instancji skryptu
 local INSTANCE_ID = os.time() .. "_" .. math.random(10000, 99999)
 storage.CurrentScriptToken = INSTANCE_ID
 
 -- --- FUNKCJA CZYSTKI (KILL EVERYTHING) ---
--- Musi byc bardzo dokladna, zeby usunac ikony "Zombie"
+-- Ulepszona wersja: usuwa wszystko co zaczyna się od "GuildBot_" oraz specyficzne ID
 local function KILL_EVERYTHING()
     local idsToRemove = {
-        "GuildBot_Main_Panel_V15",
-        "GuildBot_Paral_UI_V15", 
-        "GuildBot_Guild_Label",
-        "GuildBot_Enemy_Label",
-        "GuildBot_Paral_Label",
         "BlessSetupWindow_Unique",
         "HotkeyProWindow_Unique",
-        "GuildBot_Overlay_Info",
-        "autoParalRunaIcon", -- ID Ikony runy
-        "autoParalBombaIcon", -- ID Ikony bomby
         "BotSwitch" -- Ogolna klasa
     }
 
-    -- Funkcja pomocnicza do niszczenia dzieci o danym ID w rodzicu
-    local function destroyInParent(parent, idList)
+    -- Funkcja pomocnicza do niszczenia dzieci o danym ID lub Prefixie w rodzicu
+    local function cleanParent(parent)
         if not parent then return end
-        for _, id in ipairs(idList) do
-            local child = parent:recursiveGetChildById(id)
-            if child then 
-                child:destroy() 
+        local children = parent:getChildren()
+        if not children then return end
+        
+        -- Lecimy od tylu, zeby bezpiecznie usuwac w trakcie iteracji
+        for i = #children, 1, -1 do
+            local child = children[i]
+            local childId = child:getId()
+            
+            local shouldDestroy = false
+            
+            -- Sprawdzamy czy ID zaczyna sie od GuildBot_
+            if childId and string.find(childId, "GuildBot_") then
+                shouldDestroy = true
+            end
+            
+            -- Sprawdzamy liste statyczna
+            if not shouldDestroy then
+                for _, id in ipairs(idsToRemove) do
+                    if childId == id then
+                        shouldDestroy = true
+                        break
+                    end
+                end
+            end
+
+            if shouldDestroy then
+                child:destroy()
             end
         end
     end
 
     -- 1. Czyscimy Root (Glowne okna)
-    destroyInParent(g_ui.getRootWidget(), idsToRemove)
+    cleanParent(g_ui.getRootWidget())
     
     -- 2. Czyscimy Map Panel (Overlaye)
-    destroyInParent(modules.game_interface.getMapPanel(), idsToRemove)
+    cleanParent(modules.game_interface.getMapPanel())
 
-    -- 3. Czyscimy Top Menu (Tam czesto lądują ikony z addIcon)
+    -- 3. Czyscimy Top Menu (Tam lądują ikony z addIcon)
     if modules.client_topmenu then
-        destroyInParent(modules.client_topmenu.getTopMenu(), idsToRemove)
+        cleanParent(modules.client_topmenu.getTopMenu())
+        -- Czasami ikony lądują w lewym panelu top menu
+        local leftPanel = modules.client_topmenu.getTopMenu():recursiveGetChildById('leftGameButtonsPanel')
+        if leftPanel then cleanParent(leftPanel) end
     end
 
-    -- 4. Czyscimy Left/Right Panele (Alternatywne miejsca ikon)
+    -- 4. Czyscimy Left/Right Panele
     if modules.game_interface then
-        destroyInParent(modules.game_interface.getLeftPanel(), idsToRemove)
-        destroyInParent(modules.game_interface.getRightPanel(), idsToRemove)
+        cleanParent(modules.game_interface.getLeftPanel())
+        cleanParent(modules.game_interface.getRightPanel())
     end
 end
 
@@ -54,7 +71,7 @@ KILL_EVERYTHING()
 
 -- Opozniony start zeby dac czas na cleanup
 schedule(100, function()
-    -- Sprawdzamy czy ta instancja nadal jest tą "Glowna" (czy nie bylo kolejnego reloadu w miedzyczasie)
+    -- Sprawdzamy czy ta instancja nadal jest tą "Glowna"
     if storage.CurrentScriptToken ~= INSTANCE_ID then return end
 
     local function amIAlive()
@@ -63,38 +80,54 @@ schedule(100, function()
 
     local function Main()
         -- --- WRAPPERY BEZPIECZENSTWA ---
-        -- Te wrappery zapobiegaja dzialaniu funkcji "Zombie" po reloadzie
+        -- Te wrappery zapobiegaja dzialaniu funkcji z poprzednich ładowań ("Zombie")
+        
+        -- Wrapper Macro
         local _macro = macro
         macro = function(delay, funcOrName, func)
             local callback = func
             if type(funcOrName) == "function" then callback = funcOrName end
             local safeCallback = function()
-                if not amIAlive() then return end -- ZABICIE ZOMBIE
+                if not amIAlive() then return end
                 if callback then callback() end
             end
             if type(funcOrName) == "string" then return _macro(delay, funcOrName, safeCallback)
             else return _macro(delay, safeCallback) end
         end
 
-        local _onTalk = onTalk
-        onTalk = function(callback)
-            if _onTalk then
-                _onTalk(function(...)
-                    if not amIAlive() then return end
-                    return callback(...)
-                end)
+        -- Helper do wrappowania eventow
+        local function wrapEvent(originalFunc)
+            return function(callback)
+                if originalFunc then
+                    originalFunc(function(...)
+                        if not amIAlive() then return end -- Jeśli stara instancja, przerywamy
+                        return callback(...)
+                    end)
+                end
             end
         end
 
+        -- Wrappujemy wszystkie listenery (TO NAPRAWIA DASH I HOTKEYE)
+        local _onTalk = onTalk
+        onTalk = wrapEvent(_onTalk)
+
         local _onTextMessage = onTextMessage
-        onTextMessage = function(callback)
-            if _onTextMessage then
-                _onTextMessage(function(...)
-                    if not amIAlive() then return end
-                    return callback(...)
-                end)
-            end
-        end
+        onTextMessage = wrapEvent(_onTextMessage)
+
+        local _onKeyPress = onKeyPress
+        onKeyPress = wrapEvent(_onKeyPress)
+
+        local _onKeyDown = onKeyDown
+        onKeyDown = wrapEvent(_onKeyDown)
+
+        local _onKeyUp = onKeyUp
+        onKeyUp = wrapEvent(_onKeyUp)
+        
+        local _onPlayerPositionChange = onPlayerPositionChange
+        onPlayerPositionChange = wrapEvent(_onPlayerPositionChange)
+
+        local _onCreatureAppear = onCreatureAppear
+        onCreatureAppear = wrapEvent(_onCreatureAppear)
 
         local _setupUI = setupUI
         setupUI = function(def, parent) return _setupUI(def, parent) end
@@ -249,7 +282,6 @@ schedule(100, function()
         end
         local hConfig = storage[hotkeyPanelName]
         
-        -- Domyślne wartości hotkeyów
         local hotkeyList = {
             { id = "mw",      name = "Magic Wall",            default = "F1" },
             { id = "grav",    name = "Grav",                  default = "F2" },
@@ -265,11 +297,10 @@ schedule(100, function()
             { id = "walk",    name = "Dash MW",               default = "R" }
         }
 
-        -- FIX: Wymuszamy domyślne Enabled na TRUE po reloadzie, jeśli jest nil
         for _, item in ipairs(hotkeyList) do
             if hConfig[item.id .. "Key"] == nil then hConfig[item.id .. "Key"] = item.default end
             if hConfig[item.id .. "Block"] == nil then hConfig[item.id .. "Block"] = true end
-            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = true end -- To naprawia niedziałające hotkeye
+            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = true end
         end
 
         local panelName = "scriptManager" 
@@ -537,14 +568,13 @@ schedule(100, function()
 
         -- --- VOCATION CHECK FIX (NAPRAWA SPAMU LOOK) ---
         local myVocation
-        local vocationRegex = [[You see yourself. You are an? (%a+ %a+)]] -- Ulepszony regex
+        local vocationRegex = [[You see yourself. You are an? (%a+ %a+)]]
         local vocationCheckCount = 0
 
         local function checkMyVocation()
             if not amIAlive() then return end
             if myVocation then return end
             
-            -- Bezpiecznik przed nieskonczonym spamem po reloadzie
             if vocationCheckCount > 15 then return end 
             vocationCheckCount = vocationCheckCount + 1
             
@@ -1629,6 +1659,8 @@ BlessSetupWindow < MainWindow
                     local icon = addIcon(s.label, {item = {id = itemId}, text = txt, movable = true}, function(ic)
                         s.macro.toggle() 
                     end)
+                    -- DODANO: Ustawienie ID dla ikony, zeby KILL_EVERYTHING moglo ja usunac
+                    icon:setId("GuildBot_Icon_" .. s.key)
                     activeWidgets[s.key] = icon
                 
                 elseif showPanel then
