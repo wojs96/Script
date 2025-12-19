@@ -275,7 +275,7 @@ schedule(100, function()
             return COLORS.FRIEND, "white"
         end
 
-        -- --- HOTKEYS CONFIG (NAPRAWA DASHA) ---
+        -- --- HOTKEYS CONFIG (NAPRAWA DASHA + DOMYŚLNIE WYŁĄCZONE) ---
         local hotkeyPanelName = "hotkeysManager"
         if type(storage[hotkeyPanelName]) ~= "table" then
             storage[hotkeyPanelName] = {}
@@ -297,10 +297,12 @@ schedule(100, function()
             { id = "walk",    name = "Dash MW",               default = "R" }
         }
 
+        -- FIX: Ustawiamy domyslne wartości.
+        -- Zmiana: Jeśli 'Enabled' jest nil (czyli skrypt odpalony 1. raz), ustawiamy na FALSE.
         for _, item in ipairs(hotkeyList) do
             if hConfig[item.id .. "Key"] == nil then hConfig[item.id .. "Key"] = item.default end
             if hConfig[item.id .. "Block"] == nil then hConfig[item.id .. "Block"] = true end
-            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = true end
+            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = false end -- DOMYSLNIE WYLACZONE
         end
 
         local panelName = "scriptManager" 
@@ -1179,7 +1181,7 @@ HotkeyProWindow < MainWindow
                 entry.block:setChecked(blockVal)
 
                 local enabledVal = hConfig[item.id .. "Enabled"]
-                if enabledVal == nil then enabledVal = true end
+                if enabledVal == nil then enabledVal = false end -- DOMYSLNIE OFF
                 entry.state:setChecked(enabledVal)
                 entry.state:setTooltip(enabledVal and "Status: ON" or "Status: OFF")
 
