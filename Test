@@ -3,7 +3,7 @@ local INSTANCE_ID = os.time() .. "_" .. math.random(10000, 99999)
 storage.CurrentScriptToken = INSTANCE_ID
 
 -- --- ZABEZPIECZENIE PRZED "WRAPPINGIEM WRAPPERA" ---
--- Zapisujemy oryginalne funkcje systemowe tylko RAZ, zeby ich nie psuc przy reloadzie
+-- Zapisujemy oryginalne funkcje systemowe tylko RAZ
 if not storage.SystemCallbacks then
     storage.SystemCallbacks = {
         onKeyPress = onKeyPress,
@@ -17,7 +17,7 @@ if not storage.SystemCallbacks then
     }
 end
 
--- Przywracamy czyste funkcje systemowe przed rozpoczeciem (naprawia problem z niedzialajacymi hotkeyami)
+-- Przywracamy czyste funkcje
 if storage.SystemCallbacks.onKeyPress then onKeyPress = storage.SystemCallbacks.onKeyPress end
 if storage.SystemCallbacks.onKeyDown then onKeyDown = storage.SystemCallbacks.onKeyDown end
 if storage.SystemCallbacks.onKeyUp then onKeyUp = storage.SystemCallbacks.onKeyUp end
@@ -43,15 +43,11 @@ local function KILL_EVERYTHING()
         "BotSwitch"
     }
 
-    -- 1. Usuwanie paneli (rekurencyjne szukanie)
     for _, id in ipairs(idsToRemove) do
         local widget = root:recursiveGetChildById(id)
-        if widget then
-            widget:destroy()
-        end
+        if widget then widget:destroy() end
     end
 
-    -- 2. Usuwanie ikon z TopMenu
     if modules.client_topmenu then
         local topMenu = modules.client_topmenu.getTopMenu()
         if topMenu then
@@ -70,11 +66,9 @@ local function KILL_EVERYTHING()
     end
 end
 
--- Wykonaj czystke
 KILL_EVERYTHING()
 
 schedule(100, function()
-    -- Sprawdzamy czy ta instancja jest aktualna
     if storage.CurrentScriptToken ~= INSTANCE_ID then return end
 
     local function amIAlive()
@@ -82,10 +76,7 @@ schedule(100, function()
     end
 
     local function Main()
-        -- --- NOWE WRAPPERY (POPRAWIONE) ---
-        -- Uzywamy oryginalnych funkcji, ale dodajemy warunek amIAlive wewnatrz callbacka.
-        -- To standardowa metoda w OTCv8, ktora nie psuje hotkeyow.
-        
+        -- --- NOWE WRAPPERY ---
         local function wrap(originalFunc)
             return function(callback)
                 if originalFunc then
@@ -110,7 +101,6 @@ schedule(100, function()
             end
         end
 
-        -- Nadpisujemy lokalnie funkcje dla TEJ instancji Main
         onKeyPress = wrap(onKeyPress)
         onKeyDown = wrap(onKeyDown)
         onKeyUp = wrap(onKeyUp)
@@ -268,6 +258,7 @@ schedule(100, function()
 
         -- --- HOTKEYS CONFIG ---
         local hotkeyPanelName = "hotkeysManager"
+        -- Inicjalizacja tabeli, jesli nie istnieje
         if type(storage[hotkeyPanelName]) ~= "table" then
             storage[hotkeyPanelName] = {}
         end
@@ -288,12 +279,14 @@ schedule(100, function()
             { id = "walk",    name = "Dash MW",               default = "R" }
         }
 
-        -- DOMYSLNIE WYLACZONE
+        local dirty = false
         for _, item in ipairs(hotkeyList) do
-            if hConfig[item.id .. "Key"] == nil then hConfig[item.id .. "Key"] = item.default end
-            if hConfig[item.id .. "Block"] == nil then hConfig[item.id .. "Block"] = true end
-            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = false end
+            if hConfig[item.id .. "Key"] == nil then hConfig[item.id .. "Key"] = item.default dirty = true end
+            if hConfig[item.id .. "Block"] == nil then hConfig[item.id .. "Block"] = true dirty = true end
+            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = false dirty = true end
         end
+        -- Jesli cos zmienilismy w domyslnych, wymuszamy zapis
+        if dirty then storage[hotkeyPanelName] = hConfig end
 
         local panelName = "scriptManager" 
         if type(storage[panelName]) ~= "table" then
@@ -567,7 +560,7 @@ schedule(100, function()
             if not amIAlive() then return end
             if myVocation then return end
             
-            -- FIX SPAMU: Sprawdzamy czy mamy juz zapisane w storage
+            -- Jesli juz mamy to w storage, uzywamy i nie sprawdzamy
             if storage.mySavedVocation then
                 myVocation = storage.mySavedVocation
                 return
@@ -593,7 +586,7 @@ schedule(100, function()
                 
                 if detected ~= "Unknown" then
                     myVocation = detected
-                    storage.mySavedVocation = detected
+                    storage.mySavedVocation = detected -- Zapisz do storage
                 end
             end
         end)
@@ -1193,12 +1186,14 @@ HotkeyProWindow < MainWindow
 
                 entry.key.onTextChange = function(widget, text)
                     hConfig[item.id .. "Key"] = text
+                    storage[hotkeyPanelName] = hConfig -- FORCE SAVE
                 end
 
                 entry.block.onClick = function(widget)
                     local keyName = item.id .. "Block"
                     hConfig[keyName] = not hConfig[keyName]
                     widget:setChecked(hConfig[keyName])
+                    storage[hotkeyPanelName] = hConfig -- FORCE SAVE
                 end
 
                 entry.state.onClick = function(widget)
@@ -1206,6 +1201,7 @@ HotkeyProWindow < MainWindow
                     hConfig[keyName] = not hConfig[keyName]
                     widget:setChecked(hConfig[keyName])
                     widget:setTooltip(hConfig[keyName] and "Status: ON" or "Status: OFF")
+                    storage[hotkeyPanelName] = hConfig -- FORCE SAVE
                 end
             end
 
@@ -1607,6 +1603,7 @@ BlessSetupWindow < MainWindow
                 row.checkShow.onClick = function(w)
                     local newState = not config[showKey]
                     config[showKey] = newState
+                    storage[panelName] = config -- FORCE SAVE
                     w:setChecked(newState)
                     if newState then
                         config[iconKey] = false
@@ -1616,6 +1613,7 @@ BlessSetupWindow < MainWindow
                 row.checkIcon.onClick = function(w)
                     local newState = not config[iconKey]
                     config[iconKey] = newState
+                    storage[panelName] = config -- FORCE SAVE
                     w:setChecked(newState)
                     if newState then
                         config[showKey] = false
@@ -1624,19 +1622,19 @@ BlessSetupWindow < MainWindow
                 end
                 
                 row.txtIconText:setText(config["text"..script.key] or script.defaultText)
-                row.txtIconText.onTextChange = function(w, t) config["text"..script.key] = t end
+                row.txtIconText.onTextChange = function(w, t) config["text"..script.key] = t storage[panelName] = config end
                 row.txtId:setText(config["id"..script.key] or script.defaultId)
-                row.txtId.onTextChange = function(w, t) config["id"..script.key] = tonumber(t) or script.defaultId end
+                row.txtId.onTextChange = function(w, t) config["id"..script.key] = tonumber(t) or script.defaultId storage[panelName] = config end
             end
             
             sWindow.txtMw:setText(config.holdMwKey or "F11")
-            sWindow.txtMw.onTextChange = function(w, text) config.holdMwKey = text end
+            sWindow.txtMw.onTextChange = function(w, text) config.holdMwKey = text storage[panelName] = config end
             sWindow.txtWg:setText(config.holdWgKey or "F12")
-            sWindow.txtWg.onTextChange = function(w, text) config.holdWgKey = text end
+            sWindow.txtWg.onTextChange = function(w, text) config.holdWgKey = text storage[panelName] = config end
             sWindow.txtSsaBp:setText(config.contSsaId or 2869)
-            sWindow.txtSsaBp.onTextChange = function(w, text) if tonumber(text) then config.contSsaId = tonumber(text) end end
+            sWindow.txtSsaBp.onTextChange = function(w, text) if tonumber(text) then config.contSsaId = tonumber(text) storage[panelName] = config end end
             sWindow.txtMrBp:setText(config.contMrId or 2866)
-            sWindow.txtMrBp.onTextChange = function(w, text) if tonumber(text) then config.contMrId = tonumber(text) end end
+            sWindow.txtMrBp.onTextChange = function(w, text) if tonumber(text) then config.contMrId = tonumber(text) storage[panelName] = config end end
             
             sWindow.txtCmd:setText(storage.commander or "Gladiator")
             sWindow.txtCmd.onTextChange = function(widget, newText)
@@ -1717,7 +1715,10 @@ BlessSetupWindow < MainWindow
             for _, s in ipairs(scriptsList) do
                 if s.macro then
                     local on = s.macro.isOn()
-                    if config["state"..s.key] ~= on then config["state"..s.key] = on end
+                    if config["state"..s.key] ~= on then 
+                        config["state"..s.key] = on 
+                        storage[panelName] = config -- FORCE SAVE STATE
+                    end
                     local w = activeWidgets[s.key]
                     if w then
                         local won = false
@@ -1958,11 +1959,11 @@ Panel
             local editWin = UI.MultilineEditorWindow(storage.enemyList or "", {title="Enemy List"}, function(t) storage.enemyList = t end)
         end
         paralUI.magicProfessionCheckBox:setChecked(config.magicProfessionOnly)
-        paralUI.magicProfessionCheckBox.onCheckChange = function(self, c) config.magicProfessionOnly = c end
+        paralUI.magicProfessionCheckBox.onCheckChange = function(self, c) config.magicProfessionOnly = c storage[panelName] = config end
         paralUI.skullOnlyCheckBox:setChecked(config.skullOnly)
-        paralUI.skullOnlyCheckBox.onCheckChange = function(self, c) config.skullOnly = c end
+        paralUI.skullOnlyCheckBox.onCheckChange = function(self, c) config.skullOnly = c storage[panelName] = config end
         paralUI.canShootOnlyCheckBox:setChecked(config.canShootOnly)
-        paralUI.canShootOnlyCheckBox.onCheckChange = function(self, c) config.canShootOnly = c end
+        paralUI.canShootOnlyCheckBox.onCheckChange = function(self, c) config.canShootOnly = c storage[panelName] = config end
 
         local runeIcon = addIcon("autoParalRunaIcon", {item=3165, text="Runa", movable=true}, function(icon) if myVocation == "ED" then AutoParalRuneMacro.toggle() end end)
         if runeIcon then runeIcon:hide() end
