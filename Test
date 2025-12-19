@@ -239,8 +239,8 @@ schedule(50, function()
 
         for _, item in ipairs(hotkeyList) do
             if hConfig[item.id .. "Key"] == nil then hConfig[item.id .. "Key"] = item.default end
-            if hConfig[item.id .. "Block"] == nil then hConfig[item.id .. "Block"] = true end
-            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = true end
+            if hConfig[item.id .. "Block"] == nil then hConfig[item.id .. "Block"] = false end
+            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = false end
         end
 
         local panelName = "scriptManager" 
