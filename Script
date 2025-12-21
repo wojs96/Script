@@ -50,7 +50,51 @@ schedule(50, function()
     if not amIAlive() then return end
 
     local function Main()
+
+        local player = g_game.getLocalPlayer()
+        local playerName = player:getName()
+        local vocStorageKey = "SavedVoc_" .. playerName 
         
+        local myVocation = storage[vocStorageKey]
+        local vocationRegex = [[You see yourself. You are an? (.-)%.]]
+        local vocationCheckCount = 0
+
+        local function checkMyVocation()
+            if not amIAlive() then return end
+            if myVocation then return end
+            
+            if storage[vocStorageKey] then
+                myVocation = storage[vocStorageKey]
+                return
+            end
+            
+            if vocationCheckCount > 5 then return end 
+            vocationCheckCount = vocationCheckCount + 1
+            
+            g_game.look(player)
+            schedule(2000, checkMyVocation)
+        end
+
+        onTextMessage(function(mode, text)
+            if not amIAlive() then return end
+            local vocation = text:match(vocationRegex)
+            if vocation then
+                local lv = vocation:lower()
+                if lv:find("master sorcerer") then myVocation = "MS"
+                elseif lv:find("elder druid") then myVocation = "ED"
+                elseif lv:find("elite knight") then myVocation = "EK"
+                elseif lv:find("royal paladin") then myVocation = "RP"
+                else myVocation = "Unknown" end
+                
+                if myVocation ~= "Unknown" then
+                    storage[vocStorageKey] = myVocation
+                end
+            end
+        end)
+        
+        if not storage[vocStorageKey] then
+            checkMyVocation()
+        end
 
         local function safeOnKeyPress(keys)
             if not amIAlive() then return end
@@ -199,7 +243,6 @@ schedule(50, function()
             return COLORS.FRIEND, "white"
         end
 
-        -- --- HOTKEYS CONFIG ---
         local hotkeyPanelName = "hotkeysManager"
         if type(storage[hotkeyPanelName]) ~= "table" then
             storage[hotkeyPanelName] = {}
@@ -233,7 +276,6 @@ schedule(50, function()
         end
         local config = storage[panelName]
 
-        -- --- HELPERY LOGICZNE ---
         local function safeSetOff(macroObj)
             if macroObj and macroObj.isOn() then macroObj.setOff() end
         end
@@ -548,6 +590,22 @@ schedule(50, function()
             end
         end)
 
+        local AntyParalMacro = macro(100, function()
+            if not amIAlive() then return end
+            if not isParalyzed() then return end
+        
+            if myVocation == "EK" then
+                say("exana mort")
+            elseif myVocation == "RP" then
+                say("exura san")
+            elseif myVocation == "MS" then
+                say("exura vita")
+            elseif myVocation == "ED" then
+                local pName = g_game.getLocalPlayer():getName()
+                say('exura sio "' .. pName .. '"')
+            end
+        end)
+
         local scriptsList = {
             { key = "GuildHealing_V15", label = "Guild Healing", defaultId = 3160, macro = guildhealing, defaultText="GHeal" },
             { key = "Recognize_V15",    label = "Marker",  defaultId = 2641, macro = recognizeMacro, defaultText="Marker", color="red" },
@@ -562,47 +620,8 @@ schedule(50, function()
             { key = "AutoSSA_V15", label = "Auto SSA", defaultId = 3081, macro = AutoSSAMacro, defaultText="SSA", color="green" },
             { key = "AutoMR_V15", label = "Auto MR", defaultId = 3048, macro = AutoMRMacro, defaultText="MR", color="green" },
             { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" },
+            { key = "AntyParal_V15", label = "AntyParal", defaultId = 3165, macro = AntyParalMacro, defaultText="AntyParal" },
         }
-
-        local myVocation = storage.mySavedVocation
-        local vocationRegex = [[You see yourself. You are an? (.-)%.]]
-        local vocationCheckCount = 0
-
-        local function checkMyVocation()
-            if not amIAlive() then return end
-            if myVocation then return end
-            
-            if storage.mySavedVocation then
-                myVocation = storage.mySavedVocation
-                return
-            end
-            
-            if vocationCheckCount > 5 then return end 
-            vocationCheckCount = vocationCheckCount + 1
-            
-            g_game.look(player)
-            schedule(2000, checkMyVocation)
-        end
-        onTextMessage(function(mode, text)
-            if not amIAlive() then return end
-            local vocation = text:match(vocationRegex)
-            if vocation then
-                local lv = vocation:lower()
-                if lv:find("master sorcerer") then myVocation = "MS"
-                elseif lv:find("elder druid") then myVocation = "ED"
-                elseif lv:find("elite knight") then myVocation = "EK"
-                elseif lv:find("royal paladin") then myVocation = "RP"
-                else myVocation = "Unknown" end
-                
-                if myVocation ~= "Unknown" then
-                    storage.mySavedVocation = myVocation
-                end
-            end
-        end)
-        
-        if not storage.mySavedVocation then
-            checkMyVocation()
-        end
 
         macro(200, function()
             if myVocation == "MS" or myVocation == "ED" then
