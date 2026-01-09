@@ -1839,8 +1839,11 @@ Label
             return math.max(math.abs(p1.x - p2.x), math.abs(p1.y - p2.y))
         end
 
-        local AutoParalRuneMacro = macro(200, function()
+local AutoParalRuneMacro = macro(200, function()
+            if not amIAlive() then return end 
+
             if myVocation ~= "ED" then return end 
+            
             if not isInPz() and not g_game.isSafeFight() then
                 local target = g_game.getAttackingCreature()
                 if target and target:isPlayer() then
@@ -1886,6 +1889,8 @@ Label
         AutoParalRuneMacro.setOff()
 
         local AutoParalBombMacro = macro(200, function()
+            if not amIAlive() then return end
+            
             if myVocation ~= "ED" then return end
             if not isInPz() and not g_game.isSafeFight() then
                 local target = g_game.getAttackingCreature()
