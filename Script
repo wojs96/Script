@@ -1839,9 +1839,8 @@ Label
             return math.max(math.abs(p1.x - p2.x), math.abs(p1.y - p2.y))
         end
 
-local AutoParalRuneMacro = macro(200, function()
-            if not amIAlive() then return end 
-
+        local AutoParalRuneMacro = macro(200, function()
+            if not amIAlive() then return end
             if myVocation ~= "ED" then return end 
             
             if not isInPz() and not g_game.isSafeFight() then
@@ -1886,12 +1885,13 @@ local AutoParalRuneMacro = macro(200, function()
                 end
             end
         end)
+
         AutoParalRuneMacro.setOff()
 
         local AutoParalBombMacro = macro(200, function()
             if not amIAlive() then return end
-            
             if myVocation ~= "ED" then return end
+            
             if not isInPz() and not g_game.isSafeFight() then
                 local target = g_game.getAttackingCreature()
                 local bombItem = findItem(9016)
@@ -1943,7 +1943,9 @@ local AutoParalRuneMacro = macro(200, function()
                 end
             end
         end)
+
         AutoParalBombMacro.setOff()
+
 
         local paralUI = setupUI([[
 Panel
@@ -1996,25 +1998,33 @@ Panel
         paralUI.canShootOnlyCheckBox:setChecked(config.canShootOnly)
         paralUI.canShootOnlyCheckBox.onCheckChange = function(self, c) config.canShootOnly = c end
 
-        local runeIcon = addIcon("autoParalRunaIcon", {item=3165, text="Runa", movable=true}, function(icon) 
+        local runeIcon = addIcon("autoParalRunaIcon", {text="Para Runa\nOFF", switchable=false, movable=true}, function(icon) 
             if myVocation == "ED" then 
-                AutoParalRuneMacro.toggle() 
-                icon:setOn(AutoParalRuneMacro.isOn())
+                AutoParalRuneMacro.toggle()
             end 
         end)
-        if runeIcon then runeIcon:hide() end
+        if runeIcon then 
+            runeIcon:hide() 
+            runeIcon:setSize({height=30, width=40})
+            runeIcon.text:setFont('verdana-11px-rounded')
+        end
 
-        local bombIcon = addIcon("autoParalBombaIcon", {item=9016, text="Bomb", movable=true}, function(icon) 
+        local bombIcon = addIcon("autoParalBombaIcon", {text="Para Bomb\nOFF", switchable=false, movable=true}, function(icon) 
             if myVocation == "ED" then 
-                AutoParalBombMacro.toggle() 
-                icon:setOn(AutoParalBombMacro.isOn())
+                AutoParalBombMacro.toggle()
             end 
         end)
-        if bombIcon then bombIcon:hide() end
+        if bombIcon then 
+            bombIcon:hide() 
+            bombIcon:setSize({height=30, width=40})
+            bombIcon.text:setFont('verdana-11px-rounded')
+        end
 
-        macro(1000, function()
+        macro(500, function()
             if not amIAlive() then return end
+            
             if myVocation == "ED" then
+                -- Obsluga widocznosci
                 if not paralUI:isVisible() then 
                     paralUI:show() 
                     paralUI:setHeight(85) 
@@ -2022,10 +2032,23 @@ Panel
                     if runeIcon then runeIcon:show() end 
                     if bombIcon then bombIcon:show() end 
                 end
+
+                if runeIcon then
+                    if AutoParalRuneMacro.isOn() then
+                        runeIcon.text:setColoredText({"Para Runa\n","white","ON","green"})
+                    else
+                        runeIcon.text:setColoredText({"Para Runa\n","white","OFF","red"})
+                    end
+                end
                 
-                -- Dodana synchronizacja wizualna (zeby ikony swiecily sie gdy makro dziala)
-                if runeIcon then runeIcon:setOn(AutoParalRuneMacro.isOn()) end
-                if bombIcon then bombIcon:setOn(AutoParalBombMacro.isOn()) end
+                if bombIcon then
+                    if AutoParalBombMacro.isOn() then
+                        bombIcon.text:setColoredText({"Para Bomb\n","white","ON","green"})
+                    else
+                        bombIcon.text:setColoredText({"Para Bomb\n","white","OFF","red"})
+                    end
+                end
+
             else
                 if paralUI:isVisible() then 
                     paralUI:hide() 
@@ -2033,6 +2056,7 @@ Panel
                     paralLabel:hide() 
                     if runeIcon then runeIcon:hide() end 
                     if bombIcon then bombIcon:hide() end 
+                    
                     if AutoParalRuneMacro.isOn() then AutoParalRuneMacro.setOff() end 
                     if AutoParalBombMacro.isOn() then AutoParalBombMacro.setOff() end 
                 end
