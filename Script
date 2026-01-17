@@ -1996,17 +1996,46 @@ Panel
         paralUI.canShootOnlyCheckBox:setChecked(config.canShootOnly)
         paralUI.canShootOnlyCheckBox.onCheckChange = function(self, c) config.canShootOnly = c end
 
-        local runeIcon = addIcon("autoParalRunaIcon", {item=3165, text="Runa", movable=true}, function(icon) if myVocation == "ED" then AutoParalRuneMacro.toggle() end end)
+        local runeIcon = addIcon("autoParalRunaIcon", {item=3165, text="Runa", movable=true}, function(icon) 
+            if myVocation == "ED" then 
+                AutoParalRuneMacro.toggle() 
+                icon:setOn(AutoParalRuneMacro.isOn())
+            end 
+        end)
         if runeIcon then runeIcon:hide() end
-        local bombIcon = addIcon("autoParalBombaIcon", {item=9016, text="Bomb", movable=true}, function(icon) if myVocation == "ED" then AutoParalBombMacro.toggle() end end)
+
+        local bombIcon = addIcon("autoParalBombaIcon", {item=9016, text="Bomb", movable=true}, function(icon) 
+            if myVocation == "ED" then 
+                AutoParalBombMacro.toggle() 
+                icon:setOn(AutoParalBombMacro.isOn())
+            end 
+        end)
         if bombIcon then bombIcon:hide() end
 
         macro(1000, function()
             if not amIAlive() then return end
             if myVocation == "ED" then
-                if not paralUI:isVisible() then paralUI:show() paralUI:setHeight(85) paralLabel:show() if runeIcon then runeIcon:show() end if bombIcon then bombIcon:show() end end
+                if not paralUI:isVisible() then 
+                    paralUI:show() 
+                    paralUI:setHeight(85) 
+                    paralLabel:show() 
+                    if runeIcon then runeIcon:show() end 
+                    if bombIcon then bombIcon:show() end 
+                end
+                
+                -- Dodana synchronizacja wizualna (zeby ikony swiecily sie gdy makro dziala)
+                if runeIcon then runeIcon:setOn(AutoParalRuneMacro.isOn()) end
+                if bombIcon then bombIcon:setOn(AutoParalBombMacro.isOn()) end
             else
-                if paralUI:isVisible() then paralUI:hide() paralUI:setHeight(0) paralLabel:hide() if runeIcon then runeIcon:hide() end if bombIcon then bombIcon:hide() end if AutoParalRuneMacro.isOn() then AutoParalRuneMacro.setOff() end if AutoParalBombMacro.isOn() then AutoParalBombMacro.setOff() end end
+                if paralUI:isVisible() then 
+                    paralUI:hide() 
+                    paralUI:setHeight(0) 
+                    paralLabel:hide() 
+                    if runeIcon then runeIcon:hide() end 
+                    if bombIcon then bombIcon:hide() end 
+                    if AutoParalRuneMacro.isOn() then AutoParalRuneMacro.setOff() end 
+                    if AutoParalBombMacro.isOn() then AutoParalBombMacro.setOff() end 
+                end
             end
         end)
     end
