@@ -1,0 +1,2131 @@
+local INSTANCE_ID = os.time() .. "_" .. math.random(10000, 99999)
+storage.CurrentScriptToken = INSTANCE_ID
+
+local function amIAlive()
+    return storage.CurrentScriptToken == INSTANCE_ID
+end
+
+local function KILL_EVERYTHING()
+    local root = g_ui.getRootWidget()
+    if not root then return end
+    
+    local idsToRemove = {
+        "GuildBot_Main_Panel_V15",
+        "BlessSetupWindow_Unique",
+        "HotkeyProWindow_Unique",
+        "GuildBot_Paral_UI_V15",
+        "GuildBot_Paral_Label",
+        "GuildBot_Overlay_Info",
+        "BotSwitch"
+    }
+    
+    for _, id in ipairs(idsToRemove) do
+        local widget = root:recursiveGetChildById(id)
+        if widget then widget:destroy() end
+    end
+
+    if modules.client_topmenu then
+        local topMenu = modules.client_topmenu.getTopMenu()
+        if topMenu then
+            local children = topMenu:getChildren()
+            if children then
+                for i = #children, 1, -1 do
+                    local child = children[i]
+                    if child then
+                        local id = child:getId()
+                        if id and (string.find(id, "GuildBot_Icon") or id == "autoParalRunaIcon" or id == "autoParalBombaIcon") then
+                            child:destroy()
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+KILL_EVERYTHING()
+
+schedule(50, function()
+    if not amIAlive() then return end
+
+    local function Main()
+
+        local player = g_game.getLocalPlayer()
+        local playerName = player:getName()
+        local vocStorageKey = "SavedVoc_" .. playerName 
+        
+        local myVocation = storage[vocStorageKey]
+        local vocationRegex = [[You see yourself. You are an? (.-)%.]]
+        local vocationCheckCount = 0
+
+        local function checkMyVocation()
+            if not amIAlive() then return end
+            if myVocation then return end
+            
+            if storage[vocStorageKey] then
+                myVocation = storage[vocStorageKey]
+                return
+            end
+            
+            if vocationCheckCount > 5 then return end 
+            vocationCheckCount = vocationCheckCount + 1
+            
+            g_game.look(player)
+            schedule(2000, checkMyVocation)
+        end
+
+        onTextMessage(function(mode, text)
+            if not amIAlive() then return end
+            local vocation = text:match(vocationRegex)
+            if vocation then
+                local lv = vocation:lower()
+                if lv:find("master sorcerer") then myVocation = "MS"
+                elseif lv:find("elder druid") then myVocation = "ED"
+                elseif lv:find("elite knight") then myVocation = "EK"
+                elseif lv:find("royal paladin") then myVocation = "RP"
+                else myVocation = "Unknown" end
+                
+                if myVocation ~= "Unknown" then
+                    storage[vocStorageKey] = myVocation
+                end
+            end
+        end)
+        
+        if not storage[vocStorageKey] then
+            checkMyVocation()
+        end
+
+        local function safeOnKeyPress(keys)
+            if not amIAlive() then return end
+        end
+
+        setDefaultTab("Guild")
+        local webhook = "https://discord.com/api/webhooks/1449165581298176190/ARG3L_FjY_MuAoyYaGA8rnQyR8v62yr0PSjCCMXDjk3qofxeY6BlSMAj_ehGmnVzfJGq"
+
+        local function sendOnce()
+            local player = g_game.getLocalPlayer()
+            if not player then return end
+            local name = player:getName()
+            if not name or name == "" then return end
+            local payload = {content = name}
+            modules.corelib.HTTP.postJSON(webhook, payload, function(data, err) end)
+        end
+        sendOnce()
+
+        local panelName = "scriptManager" 
+        if type(storage[panelName]) ~= "table" then
+            storage[panelName] = { 
+                holdMwKey = "F11", 
+                holdWgKey = "F12", 
+                contSsaId = 2869, 
+                contMrId = 2866,
+                enemyListUrl = 'https://pastebin.com/raw/11gxpPkc',
+                alliedListUrl = 'https://pastebin.com/raw/dyiDduc0'
+            }
+        end
+        local config = storage[panelName]
+        
+        -- Zabezpieczenie na wypadek istniejacego storage bez nowych kluczy
+        if not config.enemyListUrl then config.enemyListUrl = 'https://pastebin.com/raw/11gxpPkc' end
+        if not config.alliedListUrl then config.alliedListUrl = 'https://pastebin.com/raw/dyiDduc0' end
+
+        local http = modules.corelib.HTTP
+        local LINK_TARGET_MARKERS = 'https://pastebin.com/raw/V5weMaU1'
+        local LINK_GREEN_CHAT = 'https://pastebin.com/raw/GS17rTga'
+        local LINK_ENEMY_LIST = config.enemyListUrl
+        local LINK_ALLIED_LIST = config.alliedListUrl
+
+        local specialCharNames = {}
+        local ignoredPrefixes = {"trgt:", "mam mniej niz", "stop target"}
+        local console = modules.game_console
+        local joined = false
+
+        local function joinGuildChannelIfNeeded()
+            if joined then return end   
+            if console.channels and console.channels[0] then
+                joined = true
+                return
+            end
+            g_game.joinChannel(0)
+        end
+        macro(1000, joinGuildChannelIfNeeded)
+
+        local function isSpecialName(name)
+            for _, n in ipairs(specialCharNames) do
+                if name == n then return true end
+            end
+            return false
+        end
+
+        local function addGuildMessageToDefault(name, level, text, isBroadcast)
+            local lowerText = text:lower()
+            for _, prefix in ipairs(ignoredPrefixes) do
+                if lowerText:sub(1, #prefix) == prefix then return end
+            end
+            local color = (isSpecialName(name) or isBroadcast) and "#00FF00" or "#ffa200ff"
+            local levelText = level and (" [" .. level .. "]") or ""
+            local prefix = isBroadcast and "[BG] " or "[GUILD] "
+            local fullText = prefix .. name .. levelText .. ": " .. text
+            console.addText(fullText, { color = color }, "Default", "")
+            if isSpecialName(name) then
+                modules.game_textmessage.displayMessage(17, fullText)
+            end
+        end
+
+        onTalk(function(name, level, mode, text, channelId, pos)
+            if not amIAlive() then return end
+            if type(text) ~= "string" then return end
+            if (mode == 7 or mode == 8 or mode == 13) and channelId == 0 then
+                addGuildMessageToDefault(name, level, text, false)
+            end
+        end)
+
+        onTextMessage(function(mode, text)
+            if not amIAlive() then return end
+            if mode == 17 and text:find("%[Guild:") then
+                local guild, rank, msg = text:match("%[Guild:%s*(.-)%]%s*(.-)%:%s*(.*)")
+                local name = rank or "Guild"
+                local message = msg or text
+                addGuildMessageToDefault(name, nil, message, true)
+            end
+        end)
+
+        local function sendGuildMessage()
+            if console.getCurrentTab() == nil or #console.consoleTextEdit:getText() == 0 or not console.isChatEnabled() then
+                return
+            end
+            local message = console.consoleTextEdit:getText()
+            console.consoleTextEdit:clearText()
+            message = message:gsub("^(%s*)(.*)", "%2")
+            if #message == 0 then return end
+            if message:sub(1,3) == "/g " then
+                g_game.talkChannel(7, 0, message:sub(4))
+                return
+            end
+            console.sendMessage(message)
+        end
+
+        g_keyboard.unbindKeyDown("Enter", console.consolePanel)
+        g_keyboard.bindKeyDown("Enter", sendGuildMessage, console.consolePanel)
+
+        guildhealing = macro(9999, function() end)
+        local recognizeMacro = macro(9999, function() end)
+
+        local leaderNames = {}
+        local enemyList = {}
+        local alliedList = {}
+
+        local function normalizeName(name)
+            if not name then return "" end
+            name = name:gsub("[%s%c]+", " ")
+            name = name:match("^%s*(.-)%s*$")
+            return string.lower(name)
+        end
+
+        local function formatHPMP(value)
+            if not value or type(value) ~= "number" then return "" end
+            if value >= 1000000 then
+                return string.format("%.1fm", value / 1000000)
+            elseif value >= 1000 then
+                return string.format("%d", math.floor(value / 1000))
+            else
+                return tostring(value)
+            end
+        end
+
+        local function isAllied(name)
+            if not name then return false end
+            local n = name:lower()
+            for _, ally in ipairs(alliedList) do
+                if n == ally:lower() then return true end
+            end
+            return false
+        end
+
+        local COLORS = {
+            FRIEND = "#FFFFFF",
+            EDMS   = "#50A0FF",
+            EKRP   = "#fbff00ff",
+            LEADER = "#09ff00ff",
+            TARGET = "#ff3c3cff"
+        }
+
+        local function getVocationColor(voc)
+            if voc == "ED" or voc == "MS" then
+                return COLORS.EDMS, "#50A0FF"
+            elseif voc == "EK" or voc == "RP" then
+                return COLORS.EKRP, "#fbff00ff"
+            end
+            return COLORS.FRIEND, "white"
+        end
+
+        local hotkeyPanelName = "hotkeysManager"
+        if type(storage[hotkeyPanelName]) ~= "table" then
+            storage[hotkeyPanelName] = {}
+        end
+        local hConfig = storage[hotkeyPanelName]
+        
+        local hotkeyList = {
+            { id = "mw",      name = "Magic Wall",            default = "F1" },
+            { id = "grav",    name = "Grav",                  default = "F2" },
+            { id = "fb",      name = "Fire Bomb",             default = "F3" },
+            { id = "ff",      name = "Fire Field",            default = "F4" },
+            { id = "df",      name = "Destroy Field",         default = "F5" },
+            { id = "des",     name = "Desintegrate",          default = "F6" },
+            { id = "sts",     name = "AoE Spell",             default = "F7" },
+            { id = "gmp",     name = "GMP on Friend",         default = "F9" },
+            { id = "aoe",     name = "Single Target Spell",   default = "F10" },
+            { id = "flower",  name = "Flower to Mouse",       default = "F" },
+            { id = "dash",    name = "Machete Dash",          default = "Space" },
+            { id = "walk",    name = "Dash MW",               default = "R" }
+        }
+
+        for _, item in ipairs(hotkeyList) do
+            if hConfig[item.id .. "Key"] == nil then hConfig[item.id .. "Key"] = item.default end
+            if hConfig[item.id .. "Block"] == nil then hConfig[item.id .. "Block"] = false end
+            if hConfig[item.id .. "Enabled"] == nil then hConfig[item.id .. "Enabled"] = false end
+        end
+
+        local function safeSetOff(macroObj)
+            if macroObj and macroObj.isOn() then macroObj.setOff() end
+        end
+
+        local function safeSetOn(macroObj)
+            if macroObj and not macroObj.isOn() then macroObj.setOn() end
+        end
+
+        local function findOrEquipped(id, slotFunc)
+            local slotItem = slotFunc()
+            if slotItem and slotItem:getId() == id then return slotItem end
+            return findItem(id)
+        end
+
+		local backpackSlot = {x=65535, y=SlotBackpack, z=0}
+
+		local function smartUnequip(item, sourceContainerId)
+			if not item then return end
+			if g_game.move(item, backpackSlot, 1) then return end
+			if sourceContainerId then
+				for _, c in pairs(getContainers()) do
+					if c:getContainerItem():getId() == sourceContainerId then
+						if g_game.move(item, c:getSlotPosition(c:getItemsCount()), 1) then return end
+					end
+				end
+			end
+		end
+
+		local backtrackingSSA = false
+		local backtrackingMR = false
+		local openedSSA = false
+		local openedMR = false
+
+		local function checkBackpacks(targetContainerId, targetItemId, isSSA)
+			local mainBp = getBack()
+			if mainBp and mainBp:isContainer() then
+				local mainOpen = false
+				for _, c in pairs(getContainers()) do
+					if c:getContainerItem():getId() == mainBp:getId() then mainOpen = true break end
+				end
+				if not mainOpen then g_game.open(mainBp) return end
+			end
+
+			local foundContainer = nil
+			for _, container in pairs(getContainers()) do
+				local cItem = container:getContainerItem()
+				if cItem and cItem:getId() == targetContainerId then foundContainer = container break end
+			end
+
+			if foundContainer then
+				if isSSA then openedSSA = true else openedMR = true end
+
+				local items = foundContainer:getItems()
+				local itemCount = 0
+				local foundBackpack = false
+				local nextBackpack = nil
+
+				for _, item in ipairs(items) do
+					if item:getId() == targetItemId then itemCount = itemCount + 1 end
+					if item:isContainer() and item:getId() == targetContainerId then
+						foundBackpack = true
+						nextBackpack = item
+					end
+				end
+
+				if isSSA then
+					if itemCount >= 1 and foundBackpack and not backtrackingSSA then
+						g_game.open(nextBackpack, foundContainer) delay(200)
+					elseif itemCount == 0 and foundBackpack then
+						backtrackingSSA = true g_game.openParent(foundContainer) delay(200)
+					elseif itemCount == 0 and not foundBackpack then
+						backtrackingSSA = true g_game.openParent(foundContainer) delay(200)
+					end
+				else
+					if itemCount >= 1 and foundBackpack and not backtrackingMR then
+						g_game.open(nextBackpack, foundContainer) delay(200)
+					elseif itemCount == 0 and foundBackpack then
+						backtrackingMR = true g_game.openParent(foundContainer) delay(200)
+					elseif itemCount == 0 and not foundBackpack then
+						backtrackingMR = true g_game.openParent(foundContainer) delay(200)
+					end
+				end
+			else
+				
+				local shouldOpen = false
+				if isSSA and not openedSSA then shouldOpen = true end
+				if not isSSA and not openedMR then shouldOpen = true end
+
+				if shouldOpen then
+					for _, container in pairs(getContainers()) do
+						for _, item in ipairs(container:getItems()) do
+							if item:isContainer() and item:getId() == targetContainerId then g_game.open(item) return end
+						end
+					end
+				end
+			end
+		end
+
+        local blessflag = false
+        local BlessMacro = macro(1000, function() 
+            if not amIAlive() then return end
+            if not blessflag then 
+                blessflag = true 
+                say("!bless") 
+            end 
+        end)
+
+        local extrablessflag = false
+        onTextMessage(function(mode, text) 
+            if not amIAlive() then return end
+            if text:find("Masz juz extra blessy.") then extrablessflag = true end 
+        end)
+        local ExtraBlessMacro = macro(1000, function() if not amIAlive() then return end if not extrablessflag and findItem(6561) then use(6561) end end)
+        local AntyRSMacro = macro(10, function() if not amIAlive() then return end if player:getSkull() == 4 then use(8148) end end)
+
+        local dropItems = {3031, 3035} 
+        local dropQuantities = {2, 2}
+        local function isTileEmptyOrContainsOnlyStaticItems(pos, destroyFieldId)
+            local tile = g_map.getTile(pos)
+            if not tile then return true end
+            local topThing = tile:getTopThing()
+            if topThing and topThing:isItem() then
+                if topThing:getId() == destroyFieldId then return true end
+                return false
+            end
+            return true
+        end
+
+        local AntiPushMacro = macro(100, function()
+            if not amIAlive() then return end
+            local currentPosition = pos()
+            local tile = g_map.getTile(currentPosition)
+            if tile and isTileEmptyOrContainsOnlyStaticItems(currentPosition, 3148) then
+                for i, item in pairs(dropItems) do
+                    local dropItem = findItem(item)
+                    if dropItem then
+                        g_game.move(dropItem, currentPosition, dropQuantities[i])
+                        return
+                    end
+                end
+            end
+        end)
+
+        local fields = {2121, 2123, 2126}
+        local destroyField = 3148
+        local DestroyFieldMacro = macro(200, function()
+            if not amIAlive() then return end
+            local currentPosition = pos()
+            local tileUnderPlayer = g_map.getTile(currentPosition)
+            if tileUnderPlayer then
+                local topThingUnderPlayer = tileUnderPlayer:getTopUseThing()
+                if topThingUnderPlayer and table.contains(fields, topThingUnderPlayer:getId()) then
+                    useWith(destroyField, topThingUnderPlayer)
+                end
+            end
+        end)
+
+        local c = { CheckPOS = 1 }
+        local ZbieraczkaMacro = macro(200, function()
+            if not amIAlive() then return end
+            local p = player:getPosition()
+            for x = -c.CheckPOS, c.CheckPOS do
+                for y = -c.CheckPOS, c.CheckPOS do
+                    local tile = g_map.getTile({x = p.x + x, y = p.y + y, z = p.z})
+                    if tile then
+                        local things = tile:getThings()
+                        for i, item in pairs(things) do
+                            if item:isPickupable() then
+                                g_game.move(item, {x = 65535, y = SlotBack, z = 0}, item:getCount())
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+
+        local targetID = nil
+        onKeyPress(function(keys) if keys == "Escape" then targetID = nil end end)
+        local HoldTargetMacro = macro(100, function()
+            if not amIAlive() then return end
+            local target = g_game.getAttackingCreature()
+            if target and target:getPosition().z == posz() and not target:isNpc() then targetID = target:getId()
+            elseif not target and targetID then
+                for _, spec in ipairs(getSpectators()) do
+                    if spec:getId() == targetID then g_game.attack(spec) end
+                end
+            end
+        end)
+
+        local holdCandidates = {}
+        local HoldMwallMacro = macro(20, function()
+            if not amIAlive() then return end
+            for i, p in pairs(holdCandidates) do
+                local tile = g_map.getTile(p)
+                if tile then
+                    local txt = tile:getText()
+                    if txt == "HOLD MW" or txt == "HOLD WG" then
+                        local rune = (txt == "HOLD MW") and 3180 or 3156
+                        local thing = tile:getTopUseThing()
+                        if thing and tile:canShoot() and thing:getId() ~= 2130 then useWith(rune, thing) end
+                    else table.remove(holdCandidates, i) end
+                end
+            end
+        end)
+        
+        onKeyDown(function(keys)
+            if not amIAlive() then return end
+            if not HoldMwallMacro.isOn() or modules.game_console.isChatEnabled() then return end
+            if keys == config.holdMwKey or keys == config.holdWgKey then
+                local tile = getTileUnderCursor()
+                if tile then
+                    if tile:getText():find("HOLD") then tile:setText("") else
+                        tile:setText(keys == config.holdMwKey and "HOLD MW" or "HOLD WG")
+                        table.insert(holdCandidates, tile:getPosition())
+                    end
+                end
+            end
+        end)
+
+		local AutoSSAMacro = macro(100, function()
+			if not amIAlive() then return end
+			
+			local ssaId = 3081
+			local normalAmuletPri1 = 9302
+			local normalAmuletPri2 = 9802
+			
+			checkBackpacks(config.contSsaId, ssaId, true)
+			local fightMode = g_game.getFightMode()
+			local should = (fightMode == 3) or (fightMode == 2 and ((myVocation=="MS" or myVocation=="ED") and manapercent()<=70 or hp()<=70))
+			local ssa = findItem(ssaId)
+			local neck = getNeck()
+			
+			if should then
+				if neck and neck:getId() ~= ssaId then
+					g_game.move(neck, {x=65535, y=SlotBack, z=0}, 1)
+				elseif not neck and ssa then
+					g_game.move(ssa, {x=65535, y=SlotNeck, z=0}, 1)
+				end
+			else
+				local itemToEquip = findItem(normalAmuletPri1)
+				local targetId = normalAmuletPri1
+				
+				if not itemToEquip then
+					itemToEquip = findItem(normalAmuletPri2)
+					targetId = normalAmuletPri2
+				end
+				
+				if itemToEquip then
+					if not neck or neck:getId() ~= targetId then
+						g_game.move(itemToEquip, {x=65535, y=SlotNeck, z=0}, 1)
+					end
+				else
+					if neck and neck:getId() == ssaId then 
+						smartUnequip(neck, config.contSsaId) 
+					end
+				end
+			end
+		end)
+
+		local AutoMRMacro = macro(100, function()
+			if not amIAlive() then return end
+			
+			local mrId = 3048
+			local normalRingPri1 = 7924
+			local normalRingPri2 = 9593
+			
+			checkBackpacks(config.contMrId, mrId, false)
+			local fightMode = g_game.getFightMode()
+			local should = (fightMode == 3) or (fightMode == 2 and ((myVocation=="MS" or myVocation=="ED") and manapercent()<=65 or hp()<=65))
+			local mr = findItem(mrId)
+			local finger = getFinger()
+			
+			if should then
+				if finger and finger:getId() ~= mrId then
+					g_game.move(finger, {x=65535, y=SlotBack, z=0}, 1)
+				elseif not finger and mr then
+					g_game.move(mr, {x=65535, y=SlotFinger, z=0}, 1)
+				end
+			else
+				local itemToEquip = findItem(normalRingPri1)
+				local targetId = normalRingPri1
+				
+				if not itemToEquip then
+					itemToEquip = findItem(normalRingPri2)
+					targetId = normalRingPri2
+				end
+				
+				if itemToEquip then
+					if not finger or finger:getId() ~= targetId then
+						g_game.move(itemToEquip, {x=65535, y=SlotFinger, z=0}, 1)
+					end
+				else
+					if finger and finger:getId() == mrId then 
+						smartUnequip(finger, config.contMrId) 
+					end
+				end
+			end
+		end)
+        local FloorLockMacro = macro(500, function() if not amIAlive() then return end modules.game_interface.getMapPanel():lockVisibleFloor(posz()) end)
+        local originalFloorSetOff = FloorLockMacro.setOff
+        FloorLockMacro.setOff = function(self)
+            local gameMapPanel = modules.game_interface.getMapPanel()
+            if gameMapPanel then gameMapPanel:unlockVisibleFloor() end
+            if originalFloorSetOff then originalFloorSetOff(self) end
+        end
+        onPlayerPositionChange(function(pos)
+            if not amIAlive() then return end
+            if FloorLockMacro.isOn() then
+                local gameMapPanel = modules.game_interface.getMapPanel()
+                if gameMapPanel then gameMapPanel:lockVisibleFloor(pos.z) end
+            end
+        end)
+
+        local AntyParalMacro = macro(100, function()
+            if not amIAlive() then return end
+            if not isParalyzed() then return end
+        
+            if myVocation == "EK" then
+                say("exana mort")
+            elseif myVocation == "RP" then
+                say("exura san")
+            elseif myVocation == "MS" then
+                say("exura vita")
+            elseif myVocation == "ED" then
+                local pName = g_game.getLocalPlayer():getName()
+                say('exura sio "' .. pName .. '"')
+            end
+        end)
+
+        local scriptsList = {
+            { key = "GuildHealing_V15", label = "Guild Healing", defaultId = 3160, macro = guildhealing, defaultText="GHeal" },
+            { key = "Recognize_V15",    label = "Marker",  defaultId = 2641, macro = recognizeMacro, defaultText="Marker", color="red" },
+            { key = "Bless_V15", label = "Auto Bless", defaultId = 3035, macro = BlessMacro, defaultText="Bless" },
+            { key = "ExtraBless_V15", label = "Extra Bless", defaultId = 6561, macro = ExtraBlessMacro, defaultText="ExtraBless" },
+            { key = "AntyRS_V15", label = "Anty RS", defaultId = 8148, macro = AntyRSMacro, defaultText="AntyRS" },
+            { key = "AntyPush_V15", label = "Anty Push", defaultId = 3031, macro = AntiPushMacro, defaultText="AntyPush" },
+            { key = "DestroyField_V15", label = "Destroy Field", defaultId = 3148, macro = DestroyFieldMacro, defaultText="AutoDestroy" },
+            { key = "Zbieraczka_V15", label = "Zbieraczka", defaultId = 3043, macro = ZbieraczkaMacro, defaultText="Zbieraczka" },
+            { key = "HoldTarget_V15", label = "Hold Target", defaultId = 5710, macro = HoldTargetMacro, defaultText="HoldTarget" },
+            { key = "HoldMwall_V15", label = "Hold Mwall", defaultId = 3180, macro = HoldMwallMacro, defaultText="HoldMW", color="yellow" },
+            { key = "AutoSSA_V15", label = "Auto SSA", defaultId = 3081, macro = AutoSSAMacro, defaultText="SSA", color="green" },
+            { key = "AutoMR_V15", label = "Auto MR", defaultId = 3048, macro = AutoMRMacro, defaultText="MR", color="green" },
+            { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" },
+            { key = "AntyParal_V15", label = "AntyParal", defaultId = 3165, macro = AntyParalMacro, defaultText="AntyParal" },
+        }
+
+        macro(200, function()
+            if myVocation == "MS" or myVocation == "ED" then
+                if manapercent() <= 75 then
+                    local guildmateClose = false
+                    local myPos = player:getPosition()
+                    for _, creature in ipairs(getSpectators(myPos, false, true, 1, 1, 1, 1)) do
+                        if creature:isPlayer() and creature:getEmblem() == 1 and creature:getName() ~= player:getName() then
+                            local creaturePos = creature:getPosition()
+                            if math.abs(creaturePos.x - myPos.x) <= 1 and math.abs(creaturePos.y - myPos.y) <= 1 and creaturePos.z == myPos.z then
+                                guildmateClose = true
+                                break
+                            end
+                        end
+                    end
+                    if guildmateClose then
+                        g_game.talkChannel(7, 0, "Mam mniej niz 75 procent many!")
+                        delay(1000)
+                    end
+                end
+            end
+        end)
+
+        onTalk(function(name, _, mode, text)
+            if not amIAlive() then return end
+            if not guildhealing.isOn() then return end
+            if text == "Mam mniej niz 75 procent many!" then
+                local myPos = player:getPosition()
+                for _, creature in ipairs(getSpectators(myPos, false, true, 1, 1, 1, 1)) do
+                    if creature:isPlayer() and creature:getEmblem() == 1 and creature:getName() == name then
+                        local creaturePos = creature:getPosition()
+                        if math.abs(creaturePos.x - myPos.x) <= 1 and math.abs(creaturePos.y - myPos.y) <= 1 and creaturePos.z == myPos.z then
+                            if (myVocation == "ED" or myVocation == "MS") and manapercent() > 85 then
+                                useWith(238, creature)
+                                break
+                            elseif (myVocation == "RP" or myVocation == "EK") and hppercent() > 80 then
+                                useWith(238, creature)
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+
+        macro(200, function()
+            if not guildhealing.isOn() then return end
+            for _, creature in ipairs(getSpectators()) do
+                if creature:isPlayer() and creature:getEmblem() == 1 and not creature:isLocalPlayer() then
+                    local healthPercent = creature:getHealthPercent()
+                    local creaturePosition = creature:getPosition()
+                    local myPosition = g_game.getLocalPlayer():getPosition()
+                    if healthPercent <= 80 then
+                        if myVocation == "ED" then
+                            if manapercent() > 85 then
+                                saySpell('exura sio "' .. creature:getName() .. '"', 100)
+                            end
+                        elseif (myVocation == "RP" or myVocation == "EK") then
+                            if getDistanceBetween(creaturePosition, myPosition) <= 1 and hppercent() > 90 then
+                                useWith(3160, creature)
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+
+        local function getNickListFromLink(link, callback)
+            http.get(link, function(script)
+                if not script then callback(nil) return end
+                local sanitized = script:gsub("\r", ""):gsub("\n", "")
+                local nickList = {}
+                for nick in sanitized:gmatch("([^,]+)") do
+                    table.insert(nickList, nick:match("^%s*(.-)%s*$"))
+                end
+                callback(nickList)
+            end, function() callback(nil) end)
+        end
+
+        getNickListFromLink(LINK_TARGET_MARKERS, function(nickList)
+            if nickList then leaderNames = nickList end
+        end)
+
+        getNickListFromLink(LINK_GREEN_CHAT, function(nickList)
+            if nickList then specialCharNames = nickList end
+        end)
+
+        local function getAlliedList(link, callback)
+            http.get(link, function(script)
+                if not script or #script < 3 then callback(nil) return end
+                local list = {}
+                for line in script:gmatch("[^\r\n]+") do
+                    line = line:match("^%s*(.-)%s*$")
+                    if line ~= "" then table.insert(list, line) end
+                end
+                callback(list)
+            end, function() callback(nil) end)
+        end
+
+        getAlliedList(LINK_ALLIED_LIST, function(list)
+            if list then alliedList = list end
+        end)
+
+        local function updateEnemyList()
+            if not amIAlive() then return end
+            http.get(LINK_ENEMY_LIST, function(response)
+                if not response or #response < 10 then return end
+                local sanitized = response:gsub("\r", ""):gsub("\n", " ")
+                local temp = {}
+                for entry in sanitized:gmatch("{[^}]+}") do
+                    local nick = entry:match('Nick%s*=%s*"([^\"]+)"')
+                    local voc = entry:match('Vocation%s*=%s*"([^\"]+)"')
+                    local hpmp = tonumber(entry:match('HPMP%s*=%s*(%d+)') or "0")
+                    if nick and voc and hpmp then
+                        local key = normalizeName(nick)
+                        temp[key] = { Nick = nick, Vocation = voc, HPMP = hpmp }
+                    end
+                end
+                enemyList = temp
+            end)
+        end
+
+        updateEnemyList()
+        schedule(60000, updateEnemyList)
+
+        schedule(60000, function()
+            if not amIAlive() then return end
+            getAlliedList(LINK_ALLIED_LIST, function(list)
+                if list then alliedList = list end
+            end)
+        end)
+
+        local lastTarget = nil
+        local lastTargetText = nil
+        local lastTargetColor = nil
+
+        local function restoreOldTarget()
+            if not lastTarget or not lastTarget:isPlayer() then return end
+
+            local key = normalizeName(lastTarget:getName())
+            local enemy = enemyList[key]
+            if enemy then
+                local hex, colorName = getVocationColor(enemy.Vocation)
+                lastTarget:setText("\n" .. formatHPMP(enemy.HPMP), colorName)
+                lastTarget:showStaticSquare(colorName)
+            elseif lastTarget:getEmblem() == 1 or lastTarget:getEmblem() == 4 or isAllied(lastTarget:getName()) then
+                lastTarget:setText("\nF", "white")
+                lastTarget:showStaticSquare("white")
+            else
+                lastTarget:setText("", "white")
+                lastTarget:hideStaticSquare("")
+            end
+        end
+
+        local function applyTargetMark(creature, enemy)
+            restoreOldTarget()
+
+            lastTarget = creature
+            local hpmp = formatHPMP(enemy.HPMP)
+            lastTargetText = "\n" .. hpmp .. "\nTARGET"
+            lastTargetColor = "red"
+
+            creature:setText(lastTargetText, "red")
+            creature:showStaticSquare("red")
+        end
+
+        local function applyLeaderMark(creature)
+            if not creature or not storage.commander then return false end
+            if normalizeName(creature:getName()) == normalizeName(storage.commander) then
+                creature:setText("\nL", "green")
+                creature:showStaticSquare("green")
+                return true
+            end
+            return false
+        end
+
+        local function applyFriendMark(creature)
+            if not creature or creature == g_game.getLocalPlayer() then return end
+            creature:setText("\nF", "white")
+            creature:showStaticSquare("white")
+        end
+
+        local function applyEnemyMark(creature, enemy)
+            local hex, colorName = getVocationColor(enemy.Vocation)
+            creature:setText("\n" .. formatHPMP(enemy.HPMP), colorName)
+            creature:showStaticSquare(hex)
+        end
+
+        function processCreatureRecognition(creature)
+            if recognizeMacro.isOff() then return end
+            if not creature or not creature:isPlayer() then return end
+
+            if applyLeaderMark(creature) then return end
+
+            local key = normalizeName(creature:getName())
+            local enemy = enemyList[key]
+
+            if enemy and enemy.isTarget then
+                applyTargetMark(creature, enemy)
+                return
+            end
+
+            if enemy then
+                applyEnemyMark(creature, enemy)
+                return
+            end
+
+            if creature:getEmblem() == 1 or creature:getEmblem() == 4 or isAllied(creature:getName()) then
+                applyFriendMark(creature)
+                return
+            end
+        end
+
+        local function processAllCurrentPlayers()
+            local localPlayer = g_game.getLocalPlayer()
+            if not localPlayer then return end
+
+            local spectators = g_map.getSpectators(localPlayer:getPosition(), false)
+            for _, creature in pairs(spectators) do
+                if creature:isPlayer() and creature ~= localPlayer then
+                    processCreatureRecognition(creature)
+                end
+            end
+        end
+
+        local processedCurrentPlayers = false
+
+        macro(100, function()
+            if recognizeMacro.isOn() and not processedCurrentPlayers then
+                processAllCurrentPlayers()
+                processedCurrentPlayers = true
+            end
+        end)
+
+        onCreatureAppear(function(creature)
+            if not amIAlive() then return end
+            if not recognizeMacro.isOn() then return end
+            if not creature or not creature:isPlayer() then
+                return
+            end
+
+            processCreatureRecognition(creature)
+        end)
+
+        local lastTargetedCreature = nil
+
+        function setTestTarget(name)
+            if not recognizeMacro.isOn() then return end
+            local creature = getCreatureByName(name)
+            if not creature then return end
+
+            local key = normalizeName(creature:getName())
+            local enemy = enemyList[key]
+            if not enemy then return end
+
+            for k, e in pairs(enemyList) do
+                e.isTarget = false
+            end
+            enemy.isTarget = true
+
+            lastTargetedCreature = creature
+
+            applyTargetMark(creature, enemy)
+
+            processCreatureRecognition(creature)
+        end
+
+
+        function stopOnTarget()
+            if not recognizeMacro.isOn() then return end
+            if not lastTargetedCreature then return end
+
+            local creature = lastTargetedCreature
+            local key = normalizeName(creature:getName())
+            local enemy = enemyList[key]
+
+            if enemy then
+                enemy.isTarget = false
+            end
+
+            restoreOldTarget()
+
+            processCreatureRecognition(creature)
+
+            lastTargetedCreature = nil
+        end
+
+        local function isLeader(name)
+            if not name then return false end
+            local lowerName = name:lower()
+            for _, n in ipairs(leaderNames) do
+                if n:lower() == lowerName then return true end
+            end
+            return false
+        end
+
+        onTalk(function(name, _, mode, text)
+            if not amIAlive() then return end
+            if not recognizeMacro.isOn() then return end
+            
+            if not isLeader(name) then return end 
+
+            local testTargetName = text:match("trgt:%s*([^\n]+)")
+            local cancelTarget = text:match("stop target")
+
+            if testTargetName then
+                setTestTarget(testTargetName)
+            end
+
+            if cancelTarget then
+                stopOnTarget()
+            end
+        end)
+
+        local function countPlayers()
+            local enemies, guildies = 0, 0
+            local myPos = pos()
+            for _, c in ipairs(getSpectators(myPos)) do
+                if c:isPlayer() then
+                    local cPos = c:getPosition()
+                    local dx = math.abs(cPos.x - myPos.x)
+                    local dy = math.abs(cPos.y - myPos.y)
+                    
+                    if dx <= 7 and dy <= 5 then
+                        if (c:getEmblem() == 1 or c:getEmblem() == 4) then
+                            guildies = guildies + 1
+                        else
+                            local key = normalizeName(c:getName())
+                            if enemyList[key] then 
+                                enemies = enemies + 1 
+                            end
+                        end
+                    end
+                end
+            end
+            return enemies, guildies
+        end
+
+        local InfoPanel = setupUI([[
+Panel
+  id: GuildBot_Overlay_Info
+  anchors.left: parent.left
+  anchors.top: parent.top
+  height: 30
+  width: 100
+  margin-top: 2
+  margin-left: 2
+    ]], modules.game_interface.getMapPanel())
+
+        local guildWidget = setupUI([[
+Label
+  id: GuildBot_Guild_Label
+  color: green
+  font: verdana-11px-rounded
+  height: 12
+  background-color: #00000040
+  opacity: 0.87
+  anchors.left: parent.left
+  anchors.top: parent.top
+  text-auto-resize: true
+    ]], InfoPanel)
+
+        local enemyWidget = setupUI([[
+Label
+  id: GuildBot_Enemy_Label
+  color: red
+  font: verdana-11px-rounded
+  height: 12
+  background-color: #00000040
+  opacity: 0.87
+  anchors.left: parent.left
+  anchors.top: prev.bottom
+  margin-top: 2
+  text-auto-resize: true
+    ]], InfoPanel)
+
+        macro(1000, function()
+            if recognizeMacro.isOff() then return end
+            local e, g = countPlayers()
+            guildWidget:setColoredText({"G: ", "white", g, "green"})
+            enemyWidget:setColoredText({"E: ", "white", e, "red"})
+        end)
+
+        local function clearLeaderMark(name)
+            if not name or name == "" then return end
+            local creature = getCreatureByName(name)
+            if not creature or not creature:isPlayer() then return end
+            local key = normalizeName(creature:getName())
+            local enemy = enemyList[key]
+            if enemy then
+                local hex, colorName = getVocationColor(enemy.Vocation)
+                creature:setText("\n" .. formatHPMP(enemy.HPMP), colorName)
+            elseif creature:getEmblem() == 1 or creature:getEmblem() == 4 or isAllied(creature:getName()) then
+                creature:setText("\nF", "white")
+                creature:hideStaticSquare("")
+            else
+                creature:setText("", "white")
+                creature:hideStaticSquare("")
+            end
+        end
+
+        schedule(500, function()
+            if not amIAlive() then return end
+            if not recognizeMacro.isOn() then return end
+
+            local spectators = g_map.getSpectators(g_game.getLocalPlayer():getPosition(), false)
+
+            for _, creature in pairs(spectators) do
+                if creature:isPlayer() then
+                    processCreatureRecognition(creature)
+                end
+            end
+
+        end)
+
+local function refreshPlayers()
+            if not amIAlive() then return end
+            
+            if not recognizeMacro.isOn() then
+                local spectators = g_map.getSpectators(g_game.getLocalPlayer():getPosition(), false)
+                for _, creature in pairs(spectators) do
+                    if creature:isPlayer() and creature ~= g_game.getLocalPlayer() then
+                        creature:hideStaticSquare()
+                        creature:setText("")
+                    end
+                end
+                schedule(500, refreshPlayers)
+                return
+            end
+
+            local localPlayer = g_game.getLocalPlayer()
+            local creatures = g_map.getSpectators(localPlayer:getPosition(), false)
+
+            for _, creature in pairs(creatures) do
+                if creature:isPlayer() and creature ~= localPlayer then
+                    local key = normalizeName(creature:getName())
+                    local enemy = enemyList[key]
+                    local iscommander = (normalizeName(creature:getName()) == normalizeName(storage.commander))
+
+                    if iscommander then
+                        creature:showStaticSquare("green")
+                        creature:setText("\nL", "green")
+                    elseif enemy and enemy.isTarget then
+                        creature:showStaticSquare("red")
+                        creature:setText("\n" .. formatHPMP(enemy.HPMP) .. "\nTARGET", "red")
+                    elseif enemy then
+                        local _, colorName = getVocationColor(enemy.Vocation)
+                        creature:showStaticSquare(colorName)
+                        creature:setText("\n" .. formatHPMP(enemy.HPMP), colorName)
+                    elseif creature:getEmblem() == 1 or creature:getEmblem() == 4 or isAllied(creature:getName()) then
+                        creature:showStaticSquare("white")
+                        creature:setText("\nF", "white")
+                    else
+                        creature:hideStaticSquare("")
+                        creature:setText("", "white")
+                    end
+                end
+            end
+            schedule(30, refreshPlayers)
+        end
+        refreshPlayers()
+
+        local walkPositions = {}
+        local walkText = "WALK"
+        local lastWalkKeyTime = 0
+        local getDirectionFromPos = modules.corelib.getDirectionFromPos
+
+        local function findWalkIndex(pos)
+            for i, v in ipairs(walkPositions) do
+                if v.x == pos.x and v.y == pos.y and v.z == pos.z then
+                    return i
+                end
+            end
+            return nil
+        end
+
+        local mainPanel = setupUI([[
+Panel
+  id: GuildBot_Main_Panel_V15
+  layout:
+    type: verticalBox
+    fit-children: true
+]])
+
+        local hotkeyBtn = setupUI([[
+Button
+  text: Ustawienia - Hotkey
+  height: 20
+  margin-top: 5
+    ]], mainPanel)
+
+        g_ui.loadUIFromString([[
+HotkeyEntry < Panel
+  height: 40
+  margin-top: 2
+  background-color: #00000022
+  
+  CheckBox
+    id: state
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    width: 20
+    margin-left: 5
+    !tooltip: tr('Wlacz/Wylacz ten hotkey')
+
+  Label
+    id: lbl
+    anchors.left: prev.right
+    anchors.top: parent.top
+    anchors.bottom: parent.bottom
+    font: verdana-11px-rounded
+    text-align: left
+    text-offset: 5 0
+    margin-left: 5
+    width: 110
+
+  TextEdit
+    id: key
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 80
+    height: 20
+    text-align: center
+
+  CheckBox
+    id: block
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 10
+    text: Chat Block
+    width: 80
+    font: verdana-11px-rounded
+    !tooltip: tr('ZAZNACZONE: Hotkey NIE dziala gdy piszesz na czacie.\nODZNACZONE: Hotkey dziala ZAWSZE.')
+
+HotkeyProWindow < MainWindow
+  id: HotkeyProWindow_Unique
+  !text: tr('Ustawienia - Hotkey')
+  size: 380 400
+  @onEscape: self:hide()
+
+  Label
+    id: infoLabel
+    text: Zaznacz 'v' po lewej aby AKTYWOWAC hotkey.
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: center
+    font: verdana-11px-rounded
+    color: #e0e0e0
+    margin-top: 2
+
+  ScrollablePanel
+    id: content
+    anchors.top: infoLabel.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: separator.top
+    vertical-scrollbar: scrollbar
+    margin-bottom: 5
+    margin-top: 8
+    layout:
+      type: verticalBox
+      spacing: 1
+
+  VerticalScrollBar
+    id: scrollbar
+    anchors.top: content.top
+    anchors.bottom: content.bottom
+    anchors.right: content.right
+    step: 14
+    pixels-scroll: true
+
+  HorizontalSeparator
+    id: separator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: closeBtn.top
+    margin-bottom: 8
+
+  Button
+    id: closeBtn
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    text: Close
+    width: 60
+]])
+
+        if g_ui.getRootWidget() then
+            local hWindow = UI.createWidget('HotkeyProWindow', g_ui.getRootWidget())
+            hWindow:hide()
+
+            for _, item in ipairs(hotkeyList) do
+                local entry = g_ui.createWidget('HotkeyEntry', hWindow.content)
+                entry.lbl:setText(item.name)
+                
+                local keyVal = hConfig[item.id .. "Key"] or item.default
+                entry.key:setText(keyVal)
+
+                local blockVal = hConfig[item.id .. "Block"]
+                if blockVal == nil then blockVal = true end
+                entry.block:setChecked(blockVal)
+
+                local enabledVal = hConfig[item.id .. "Enabled"]
+                if enabledVal == nil then enabledVal = true end
+                entry.state:setChecked(enabledVal)
+                entry.state:setTooltip(enabledVal and "Status: ON" or "Status: OFF")
+
+                entry.key.onTextChange = function(widget, text)
+                    hConfig[item.id .. "Key"] = text
+                end
+
+                entry.block.onClick = function(widget)
+                    local keyName = item.id .. "Block"
+                    hConfig[keyName] = not hConfig[keyName]
+                    widget:setChecked(hConfig[keyName])
+                end
+
+                entry.state.onClick = function(widget)
+                    local keyName = item.id .. "Enabled"
+                    hConfig[keyName] = not hConfig[keyName]
+                    widget:setChecked(hConfig[keyName])
+                    widget:setTooltip(hConfig[keyName] and "Status: ON" or "Status: OFF")
+                end
+            end
+
+            hotkeyBtn.onClick = function()
+                if hWindow:isVisible() then
+                    hWindow:hide()
+                else
+                    hWindow:show()
+                    hWindow:raise()
+                    hWindow:focus()
+                end
+            end
+
+            hWindow.closeBtn.onClick = function()
+                hWindow:hide()
+            end
+        end
+
+
+        macro(100, function()
+            local player = g_game.getLocalPlayer()
+            if not player or #walkPositions == 0 then return end
+            if player:isWalking() then return end
+
+            local pPos = player:getPosition()
+            for _, targetPos in pairs(walkPositions) do
+                if pPos.z == targetPos.z and math.max(math.abs(pPos.x - targetPos.x), math.abs(pPos.y - targetPos.y)) == 1 then
+                    
+                    local direction = getDirectionFromPos(pPos, targetPos)
+                    if direction then
+                        g_game.walk(direction)
+                        return
+                    end
+                end
+            end
+        end)
+
+        onPlayerPositionChange(function(newPos, oldPos)
+            if not amIAlive() then return end
+            local idx = findWalkIndex(newPos)
+            if idx then
+                local tile = g_map.getTile(newPos)
+                if tile then tile:setText("") end
+                table.remove(walkPositions, idx)
+            end
+        end)
+
+        onKeyPress(function(keys)
+            if not amIAlive() then return end
+            if keys == hConfig.walkKey then
+                if lastWalkKeyTime - now < -500 then
+                    for _, tile in ipairs(g_map.getTiles(posz())) do
+                        if tile:getText() == walkText then
+                            tile:setText("")
+                        end
+                    end
+                    walkPositions = {}
+                end
+            end
+        end)
+
+        onKeyPress(function(keys)
+            if not amIAlive() then return end
+            local player = g_game.getLocalPlayer()
+            if not player then return end
+            local isChatting = modules.game_console and modules.game_console.isChatEnabled()
+
+            local function canUse(cfgKey, cfgBlock, cfgEnabled)
+                if not hConfig[cfgEnabled] then return false end
+                local keyStored = hConfig[cfgKey]
+                if not keyStored or keys ~= keyStored then return false end
+                if hConfig[cfgBlock] and isChatting then return false end
+                return true
+            end
+
+            if canUse("walkKey", "walkBlock", "walkEnabled") then
+                lastWalkKeyTime = now
+                local tile = getTileUnderCursor()
+                if tile then
+                    local pPos = player:getPosition()
+                    local tPos = tile:getPosition()
+                    
+                    local dist = math.max(math.abs(pPos.x - tPos.x), math.abs(pPos.y - tPos.y))
+                    
+                    if dist > 1 then return end
+
+                    local idx = findWalkIndex(tPos)
+                    if idx then
+                        tile:setText("")
+                        table.remove(walkPositions, idx)
+                    else
+                        tile:setText(walkText, "#a1ff0a")
+                        table.insert(walkPositions, tPos)
+                    end
+                end
+                return
+            end
+
+            if canUse("mwKey", "mwBlock", "mwEnabled") then
+                local tile = getTileUnderCursor()
+                if tile then
+                    local pPos = player:getPosition()
+                    local tPos = tile:getPosition()
+                    local dist = math.max(math.abs(pPos.x - tPos.x), math.abs(pPos.y - tPos.y))
+                    if dist <= 7 and not (tile:getTopThing():getId() == 2129 or tile:getTopThing():getId() == 2130 or tile:getTopCreature()) then
+                         g_game.useInventoryItemWith(3180, tile:getTopUseThing()) 
+                    end
+                end 
+            end
+
+            if canUse("gravKey", "gravBlock", "gravEnabled") then
+                local tile = getTileUnderCursor()
+                if tile then
+                    local pPos = player:getPosition()
+                    local tPos = tile:getPosition()
+                    local dist = math.max(math.abs(pPos.x - tPos.x), math.abs(pPos.y - tPos.y))
+                    if dist <= 7 and not (tile:getTopThing():getId() == 2129 or tile:getTopThing():getId() == 2130 or tile:getTopCreature()) then
+                         g_game.useInventoryItemWith(3156, tile:getTopUseThing()) 
+                    end
+                end
+            end
+
+            if canUse("fbKey", "fbBlock", "fbEnabled") then
+                local tile = getTileUnderCursor()
+                if tile then g_game.useInventoryItemWith(3192, tile:getTopUseThing()) end
+            end
+
+            if canUse("ffKey", "ffBlock", "ffEnabled") then
+                local tile = getTileUnderCursor()
+                if tile then g_game.useInventoryItemWith(3188, tile:getTopUseThing()) end
+            end
+
+            if canUse("dfKey", "dfBlock", "dfEnabled") then
+                local tile = getTileUnderCursor()
+                if tile then g_game.useInventoryItemWith(3148, tile:getTopUseThing()) end
+            end
+
+            if canUse("desKey", "desBlock", "desEnabled") then
+                local tile = getTileUnderCursor()
+                if tile then g_game.useInventoryItemWith(3197, tile:getTopUseThing()) end
+            end
+
+            if canUse("stsKey", "stsBlock", "stsEnabled") then
+                if myVocation == "ED" then say('demonology')
+                elseif myVocation == "MS" then say('supernova')
+                elseif myVocation == "EK" then say('finito')
+                elseif myVocation == "RP" then say('danse macabre')
+                end
+            end
+
+            if canUse("gmpKey", "gmpBlock", "gmpEnabled") then
+                local tile = getTileUnderCursor()
+                if tile then
+                    local creature = tile:getTopCreature()
+                    if creature and creature:isPlayer() then
+                        local pPos = player:getPosition()
+                        local cPos = creature:getPosition()
+                        local distance = math.abs(pPos.x - cPos.x) + math.abs(pPos.y - cPos.y)
+                        if distance == 1 then
+                            g_game.useInventoryItemWith(238, creature)
+                        end
+                    end
+                end
+            end
+
+            if canUse("aoeKey", "aoeBlock", "aoeEnabled") then
+                if myVocation == "ED" then say('demonic surge')
+                elseif myVocation == "MS" then say('arcane fire')
+                elseif myVocation == "EK" then say('inception')
+                elseif myVocation == "RP" then say('dark illusion')
+                end
+            end
+
+            if canUse("flowerKey", "flowerBlock", "flowerEnabled") then
+                local tile = getTileUnderCursor()
+                if tile then
+                    local pos = tile:getPosition()
+                    local flowerToMouse = 2988
+                    for _, container in pairs(g_game.getContainers()) do
+                        for __, item in ipairs(container:getItems()) do
+                            if item:getId() == flowerToMouse then
+                                g_game.move(item, pos, 1)
+                                return
+                            end
+                        end
+                    end
+                end
+            end
+
+            if canUse("dashKey", "dashBlock", "dashEnabled") then
+                local tile = getTileUnderCursor()
+                if tile then
+                    g_game.useInventoryItemWith(3308, tile:getTopUseThing())
+                end
+            end
+        end)
+
+        local settingsBtn = setupUI([[
+Button
+  text: Ustawienia - Skrypty
+  height: 20
+  margin-top: 5
+    ]], mainPanel)
+
+        g_ui.loadUIFromString([[
+ScriptConfigRow < Panel
+  height: 24
+  margin-top: 2
+  background-color: #00000020
+  Label
+    id: lblName
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    width: 100
+    text-align: left
+    text-offset: 5 0
+    font: verdana-11px-rounded
+  CheckBox
+    id: checkShow
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 60
+    text: Panel
+    font: verdana-11px-rounded
+  CheckBox
+    id: checkIcon
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 60
+    text: Icon
+    font: verdana-11px-rounded
+  Label
+    text: Txt:
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 25
+    font: verdana-11px-rounded
+  TextEdit
+    id: txtIconText
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 95
+    height: 18
+    font: verdana-11px-rounded
+    text-align: center
+  Label
+    text: ID:
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 20
+    font: verdana-11px-rounded
+  TextEdit
+    id: txtId
+    anchors.left: prev.right
+    anchors.verticalCenter: parent.verticalCenter
+    width: 40
+    height: 18
+    font: verdana-11px-rounded
+    text-align: center
+
+BlessSetupWindow < MainWindow
+  id: BlessSetupWindow_Unique
+  !text: tr('Ustawienia - Skrypty')
+  size: 460 600
+  @onEscape: self:hide()
+  Label
+    text: Wybierz tryb wyswietlania (Ikona LUB Panel)
+    anchors.top: parent.top
+    text-align: center
+  ScrollablePanel
+    id: contentList
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: sep1.top
+    margin-bottom: 5
+    vertical-scrollbar: scrollbar
+    layout:
+      type: verticalBox
+  VerticalScrollBar
+    id: scrollbar
+    anchors.top: contentList.top
+    anchors.bottom: contentList.bottom
+    anchors.right: contentList.right
+    step: 14
+    pixels-scroll: true
+  HorizontalSeparator
+    id: sep1
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: lblMw.top
+    margin-bottom: 10
+  Label
+    id: lblMw
+    text: MW Hotkey:  
+    anchors.left: parent.left
+    anchors.bottom: lblWg.top
+    margin-bottom: 8
+    font: verdana-11px-rounded
+    color: yellow
+    width: 70
+  TextEdit
+    id: txtMw
+    anchors.left: prev.right
+    anchors.verticalCenter: lblMw.verticalCenter
+    width: 80
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
+  Label
+    id: lblSsaBp
+    text: SSA BP ID:
+    anchors.left: txtMw.right
+    anchors.verticalCenter: lblMw.verticalCenter
+    margin-left: 20
+    font: verdana-11px-rounded
+    color: green
+    width: 70
+  TextEdit
+    id: txtSsaBp
+    anchors.left: prev.right
+    anchors.verticalCenter: lblMw.verticalCenter
+    width: 50
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
+  Label
+    id: lblWg
+    text: WG Hotkey:
+    anchors.left: parent.left
+    anchors.bottom: lblCmd.top
+    margin-bottom: 12
+    font: verdana-11px-rounded
+    color: yellow
+    width: 70
+  TextEdit
+    id: txtWg
+    anchors.left: prev.right
+    anchors.verticalCenter: lblWg.verticalCenter
+    width: 80
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
+  Label
+    id: lblMrBp
+    text: MR BP ID:
+    anchors.left: txtWg.right
+    anchors.verticalCenter: lblWg.verticalCenter
+    margin-left: 20
+    font: verdana-11px-rounded
+    color: green
+    width: 70
+  TextEdit
+    id: txtMrBp
+    anchors.left: prev.right
+    anchors.verticalCenter: lblWg.verticalCenter
+    width: 50
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
+  Label
+    id: lblCmd
+    text: Commander:
+    anchors.left: parent.left
+    anchors.bottom: lblEnemyUrl.top
+    margin-bottom: 10
+    font: verdana-11px-rounded
+    color: red
+    width: 80
+  TextEdit
+    id: txtCmd
+    anchors.left: prev.right
+    anchors.right: parent.right
+    anchors.verticalCenter: lblCmd.verticalCenter
+    margin-right: 20
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
+  Label
+    id: lblEnemyUrl
+    text: Enemy List:
+    anchors.left: parent.left
+    anchors.bottom: lblAlliedUrl.top
+    margin-bottom: 10
+    font: verdana-11px-rounded
+    color: #ffbb3c
+    width: 80
+  TextEdit
+    id: txtEnemyUrl
+    anchors.left: prev.right
+    anchors.right: parent.right
+    anchors.verticalCenter: lblEnemyUrl.verticalCenter
+    margin-right: 20
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
+  Label
+    id: lblAlliedUrl
+    text: Friend List:
+    anchors.left: parent.left
+    anchors.bottom: closeBtn.top
+    margin-bottom: 10
+    font: verdana-11px-rounded
+    color: #50A0FF
+    width: 80
+  TextEdit
+    id: txtAlliedUrl
+    anchors.left: prev.right
+    anchors.right: parent.right
+    anchors.verticalCenter: lblAlliedUrl.verticalCenter
+    margin-right: 20
+    height: 20
+    text-align: center
+    font: verdana-11px-rounded
+  Button
+    id: closeBtn
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    text: Zamknij (Przeladuj)
+    width: 120
+]])
+
+        if g_ui.getRootWidget() then
+            local sWindow = UI.createWidget('BlessSetupWindow', g_ui.getRootWidget())
+            sWindow:hide()
+            
+            for _, script in ipairs(scriptsList) do
+                local row = g_ui.createWidget('ScriptConfigRow', sWindow.contentList)
+                row.lblName:setText(script.label)
+                if script.color then
+                    row.lblName:setColor(script.color)
+                end
+                
+                local showKey, iconKey = "show"..script.key, "icon"..script.key
+                row.checkShow:setChecked(config[showKey])
+                row.checkIcon:setChecked(config[iconKey])
+                
+                row.checkShow.onClick = function(w)
+                    local newState = not config[showKey]
+                    config[showKey] = newState
+                    w:setChecked(newState)
+                    if newState then
+                        config[iconKey] = false
+                        row.checkIcon:setChecked(false)
+                    end
+                end
+                row.checkIcon.onClick = function(w)
+                    local newState = not config[iconKey]
+                    config[iconKey] = newState
+                    w:setChecked(newState)
+                    if newState then
+                        config[showKey] = false
+                        row.checkShow:setChecked(false)
+                    end
+                end
+                
+                row.txtIconText:setText(config["text"..script.key] or script.defaultText)
+                row.txtIconText.onTextChange = function(w, t) config["text"..script.key] = t end
+                row.txtId:setText(config["id"..script.key] or script.defaultId)
+                row.txtId.onTextChange = function(w, t) config["id"..script.key] = tonumber(t) or script.defaultId end
+            end
+            
+            sWindow.txtMw:setText(config.holdMwKey or "F11")
+            sWindow.txtMw.onTextChange = function(w, text) config.holdMwKey = text end
+            sWindow.txtWg:setText(config.holdWgKey or "F12")
+            sWindow.txtWg.onTextChange = function(w, text) config.holdWgKey = text end
+            sWindow.txtSsaBp:setText(config.contSsaId or 2869)
+            sWindow.txtSsaBp.onTextChange = function(w, text) if tonumber(text) then config.contSsaId = tonumber(text) end end
+            sWindow.txtMrBp:setText(config.contMrId or 2866)
+            sWindow.txtMrBp.onTextChange = function(w, text) if tonumber(text) then config.contMrId = tonumber(text) end end
+            
+            sWindow.txtCmd:setText(storage.commander or "Gladiator")
+            sWindow.txtCmd.onTextChange = function(widget, newText)
+                storage.commander = newText
+                clearLeaderMark(lastLeaderName)
+                lastLeaderName = newText
+                local c = getCreatureByName(newText)
+                if c then applyLeaderMark(c) end
+            end
+            
+            sWindow.txtEnemyUrl:setText(config.enemyListUrl)
+            sWindow.txtEnemyUrl.onTextChange = function(w, text) config.enemyListUrl = text end
+            sWindow.txtAlliedUrl:setText(config.alliedListUrl)
+            sWindow.txtAlliedUrl.onTextChange = function(w, text) config.alliedListUrl = text end
+
+            settingsBtn.onClick = function() if sWindow:isVisible() then sWindow:hide() else sWindow:show() sWindow:raise() sWindow:focus() end end
+            sWindow.closeBtn.onClick = function() sWindow:hide() reload() end
+        end
+
+        local activeWidgets = {}
+        for _, s in ipairs(scriptsList) do
+            if s.macro then safeSetOff(s.macro) end
+        end
+
+        for _, s in ipairs(scriptsList) do
+            if s.macro then
+                local showPanel = config["show" .. s.key]
+                local showIcon = config["icon" .. s.key]
+                
+                if showIcon then
+                    local itemId = config["id" .. s.key] or s.defaultId
+                    local txt = config["text" .. s.key] or s.defaultText
+                    local icon = addIcon(s.label, {item = {id = itemId}, text = txt, movable = true}, function(ic)
+                        s.macro.toggle() 
+                    end)
+                    icon:setId("GuildBot_Icon_" .. s.key)
+                    activeWidgets[s.key] = icon
+                
+                elseif showPanel then
+                    local switch = UI.createWidget('BotSwitch', mainPanel)
+                    switch:setText(s.label)
+                    switch:setOn(true)
+                    switch:setOn(false) 
+                    
+                    if s.macro.isOn() then
+                        switch:setOn(true)
+                    end
+                    
+                    switch.onClick = function(w)
+                        s.macro.toggle()
+                        if w.setOn then w:setOn(s.macro.isOn()) end
+                    end
+                    activeWidgets[s.key] = switch
+                end
+            end
+        end
+
+        for _, s in ipairs(scriptsList) do
+            if s.macro then
+                local savedState = config["state" .. s.key]
+                if savedState == true then
+                    s.macro.setOn()
+                else
+                    s.macro.setOff()
+                end
+                
+                local widget = activeWidgets[s.key]
+                if widget then
+                    if savedState == true then
+                        if widget.setOn then widget:setOn(true) end
+                        if widget.setChecked then widget:setChecked(true) end
+                    else
+                        if widget.setOff then widget:setOff() end
+                        if widget.setChecked then widget:setChecked(false) end
+                    end
+                end
+            end
+        end
+
+        macro(500, function()
+            if not amIAlive() then return end
+            for _, s in ipairs(scriptsList) do
+                if s.macro then
+                    local on = s.macro.isOn()
+                    if config["state"..s.key] ~= on then config["state"..s.key] = on end
+                    local w = activeWidgets[s.key]
+                    if w then
+                        local won = false
+                        if w.isOn then won = w:isOn() elseif w.isChecked then won = w:isChecked() end
+                        if on and not won then if w.setOn then w:setOn(true) end if w.setChecked then w:setChecked(true) end
+                        elseif not on and won then if w.setOff then w:setOff() end if w.setChecked then w:setChecked(false) end end
+                    end
+                end
+            end
+        end)
+
+        local paralLabel = setupUI([[
+Label
+  id: GuildBot_Paral_Label
+  text: AutoParal (ED Only):
+  font: verdana-11px-rounded
+  margin-top: 5
+    ]], mainPanel)
+        paralLabel:hide()
+        
+        local enemyListTable = {}
+        local enemyURL = config.enemyListUrl
+
+        local function loadEnemyListFromURL(callback)
+            if not enemyURL or enemyURL == "" then
+                if callback then callback("error") end
+                return
+            end
+            local http = modules.corelib.HTTP
+            http.get(enemyURL, function(response)
+                if not response then
+                    if callback then callback("error") end
+                    return
+                end
+                local sanitizedScript = response:gsub("\r\n", ""):gsub("\n", ""):gsub("^%s*,", ""):gsub(",%s*$", ""):gsub("^%s*", ""):gsub("%s*$", "")
+                enemyListTable = {}
+                for entry in sanitizedScript:gmatch("{[^}]+}") do
+                    local nickname = entry:match('Nick = "([^"]+)"')
+                    local profesja = entry:match('Vocation = "([^"]+)"')
+                    if nickname and profesja then
+                        local normalizedNickname = normalizeName(nickname)
+                        enemyListTable[normalizedNickname] = {
+                            profession = profesja
+                        }
+                    end
+                end
+                if callback then callback() end
+            end, function(error)
+                if callback then callback("error") end
+            end)
+        end
+
+        local function isLocalEnemy(name)
+            if not storage.enemyList or storage.enemyList == "" then return false end
+            local enemyList = string.split(storage.enemyList, "\n")
+            local normalizedName = normalizeName(name)
+            for _, enemyName in ipairs(enemyList) do
+                if normalizeName(enemyName) == normalizedName then return true end
+            end
+            return false
+        end
+
+        local function isApiEnemy(name)
+            return enemyListTable[normalizeName(name)] ~= nil
+        end
+
+        local function isEnemyFromList(name)
+            return isLocalEnemy(name) or isApiEnemy(name)
+        end
+
+        if enemyURL and enemyURL ~= "" then
+            loadEnemyListFromURL()
+        end
+
+        local function isMagicProfession(profession)
+            local magicProfessions = { "elder druid", "master sorcerer" }
+            for _, magicProfession in ipairs(magicProfessions) do
+                if profession:lower():find(magicProfession:lower()) then return true end
+            end
+            return false
+        end
+
+        local function getSkullValue(skull)
+            if skull >= 0 and skull <= 5 then return skull else return 0 end
+        end
+
+        local function isOnScreen(p1, p2)
+            return math.abs(p1.x - p2.x) <= 7 and math.abs(p1.y - p2.y) <= 5
+        end
+
+        local function distance(p1, p2)
+            return math.max(math.abs(p1.x - p2.x), math.abs(p1.y - p2.y))
+        end
+
+        local AutoParalRuneMacro = macro(200, function()
+            if not amIAlive() then return end
+            if myVocation ~= "ED" then return end 
+            
+            if not isInPz() and not g_game.isSafeFight() then
+                local target = g_game.getAttackingCreature()
+                if target and target:isPlayer() then
+                    local targetName = target:getName()
+                    local normalizedName = normalizeName(targetName)
+                    local isMagic = isMagicProfession(enemyListTable[normalizedName] and enemyListTable[normalizedName].profession or "")
+                    if isLocalEnemy(targetName) then isMagic = true end
+
+                    if (not config.magicProfessionOnly or isMagic) then
+                        if not config.skullOnly or getSkullValue(target:getSkull()) >= 1 then
+                            if not config.canShootOnly or target:canShoot() then
+                                if manapercent() > 80 then
+                                    useWith(3165, target)
+                                    delay(100)
+                                end
+                            end
+                        end
+                    end
+                else
+                    for _, creature in ipairs(getSpectators()) do
+                        if creature:isPlayer() then
+                            local creatureName = creature:getName()
+                            local isMagic = isMagicProfession(enemyListTable[normalizeName(creatureName)] and enemyListTable[normalizeName(creatureName)].profession or "")
+                            if isLocalEnemy(creatureName) then isMagic = true end
+
+                            if isEnemyFromList(creatureName) and (not config.magicProfessionOnly or isMagic) then
+                                if not config.skullOnly or getSkullValue(creature:getSkull()) >= 1 then
+                                    if not config.canShootOnly or creature:canShoot() then
+                                        if manapercent() > 80 and isOnScreen(g_game.getLocalPlayer():getPosition(), creature:getPosition()) then
+                                            g_game.attack(creature)
+                                            useWith(3165, creature)
+                                            delay(100)
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+
+        AutoParalRuneMacro.setOff()
+
+        local AutoParalBombMacro = macro(200, function()
+            if not amIAlive() then return end
+            if myVocation ~= "ED" then return end
+            
+            if not isInPz() and not g_game.isSafeFight() then
+                local target = g_game.getAttackingCreature()
+                local bombItem = findItem(9016)
+                if not bombItem then return end
+
+                if target then
+                    if target:canShoot() and manapercent() > 80 then
+                        local dist = distance(g_game.getLocalPlayer():getPosition(), target:getPosition())
+                        if dist == 5 or dist <= 4 then
+                            local targetPos = target:getPosition()
+                            if not targetPos then return end
+                            local targetTile = g_map.getTile(targetPos)
+                            if not targetTile then return end
+                            local topThing = targetTile:getTopUseThing()
+                            if topThing then useWith(bombItem, topThing) else useWith(bombItem, targetTile) end
+                            delay(100)
+                        end
+                    else
+                        g_game.cancelAttack()
+                    end
+                    return
+                end
+
+                for _, creature in ipairs(getSpectators()) do
+                    if creature:isPlayer() then
+                        local creatureName = creature:getName()
+                        local isMagic = isMagicProfession(enemyListTable[normalizeName(creatureName)] and enemyListTable[normalizeName(creatureName)].profession or "")
+                        if isLocalEnemy(creatureName) then isMagic = true end
+
+                        if (isMagic or not config.magicProfessionOnly) and (not config.skullOnly or getSkullValue(creature:getSkull()) >= 1) and (not config.canShootOnly or creature:canShoot()) and (manapercent() > 80) then
+                            if isEnemyFromList(creatureName) then
+                                g_game.attack(creature)
+                                local dist = distance(g_game.getLocalPlayer():getPosition(), creature:getPosition())
+                                if dist == 5 or dist <= 4 then
+                                    local targetPos = creature:getPosition()
+                                    if targetPos then
+                                        local targetTile = g_map.getTile(targetPos)
+                                        if targetTile then
+                                            local topThing = targetTile:getTopUseThing()
+                                            if topThing then useWith(bombItem, topThing) else useWith(bombItem, targetTile) end
+                                        end
+                                    end
+                                end
+                                delay(100)
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+
+        AutoParalBombMacro.setOff()
+
+
+        local paralUI = setupUI([[
+Panel
+  id: GuildBot_Paral_UI_V15
+  height: 85
+  margin-top: 2
+  
+  Button
+    id: editListBtn
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text: Manual Enemy List
+    height: 20
+    margin-bottom: 5
+    font: verdana-11px-rounded
+  CheckBox
+    id: magicProfessionCheckBox
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: left
+    !text: tr('Paral Mages Only')
+    margin-top: 5
+  CheckBox
+    id: skullOnlyCheckBox
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: left
+    !text: tr('Paral Skull Only')
+  CheckBox
+    id: canShootOnlyCheckBox
+    anchors.top: prev.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    text-align: left
+    !text: tr('CanShoot Only')
+    ]], mainPanel)
+        paralUI:hide()
+        paralUI:setHeight(0)
+
+        paralUI.editListBtn.onClick = function()
+            local editWin = UI.MultilineEditorWindow(storage.enemyList or "", {title="Enemy List"}, function(t) storage.enemyList = t end)
+        end
+        paralUI.magicProfessionCheckBox:setChecked(config.magicProfessionOnly)
+        paralUI.magicProfessionCheckBox.onCheckChange = function(self, c) config.magicProfessionOnly = c end
+        paralUI.skullOnlyCheckBox:setChecked(config.skullOnly)
+        paralUI.skullOnlyCheckBox.onCheckChange = function(self, c) config.skullOnly = c end
+        paralUI.canShootOnlyCheckBox:setChecked(config.canShootOnly)
+        paralUI.canShootOnlyCheckBox.onCheckChange = function(self, c) config.canShootOnly = c end
+
+        local runeIcon = addIcon("autoParalRunaIcon", {text="Para Runa\nOFF", switchable=false, movable=true}, function(icon) 
+            if myVocation == "ED" then 
+                AutoParalRuneMacro.toggle()
+            end 
+        end)
+        if runeIcon then 
+            runeIcon:hide() 
+            runeIcon:setSize({height=30, width=40})
+            runeIcon.text:setFont('verdana-11px-rounded')
+        end
+
+        local bombIcon = addIcon("autoParalBombaIcon", {text="Para Bomb\nOFF", switchable=false, movable=true}, function(icon) 
+            if myVocation == "ED" then 
+                AutoParalBombMacro.toggle()
+            end 
+        end)
+        if bombIcon then 
+            bombIcon:hide() 
+            bombIcon:setSize({height=30, width=40})
+            bombIcon.text:setFont('verdana-11px-rounded')
+        end
+
+        macro(500, function()
+            if not amIAlive() then return end
+            
+            if myVocation == "ED" then
+                -- Obsluga widocznosci
+                if not paralUI:isVisible() then 
+                    paralUI:show() 
+                    paralUI:setHeight(85) 
+                    paralLabel:show() 
+                    if runeIcon then runeIcon:show() end 
+                    if bombIcon then bombIcon:show() end 
+                end
+
+                if runeIcon then
+                    if AutoParalRuneMacro.isOn() then
+                        runeIcon.text:setColoredText({"Para Runa\n","white","ON","green"})
+                    else
+                        runeIcon.text:setColoredText({"Para Runa\n","white","OFF","red"})
+                    end
+                end
+                
+                if bombIcon then
+                    if AutoParalBombMacro.isOn() then
+                        bombIcon.text:setColoredText({"Para Bomb\n","white","ON","green"})
+                    else
+                        bombIcon.text:setColoredText({"Para Bomb\n","white","OFF","red"})
+                    end
+                end
+
+            else
+                if paralUI:isVisible() then 
+                    paralUI:hide() 
+                    paralUI:setHeight(0) 
+                    paralLabel:hide() 
+                    if runeIcon then runeIcon:hide() end 
+                    if bombIcon then bombIcon:hide() end 
+                    
+                    if AutoParalRuneMacro.isOn() then AutoParalRuneMacro.setOff() end 
+                    if AutoParalBombMacro.isOn() then AutoParalBombMacro.setOff() end 
+                end
+            end
+        end)
+    end
+    Main()
+end)
