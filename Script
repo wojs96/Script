@@ -16,7 +16,7 @@ local function KILL_EVERYTHING()
         "GuildBot_Paral_UI",
         "GuildBot_Paral_Label",
         "GuildBot_Overlay_Info",
-        "GuildBot_BotSwitch"
+        "BotSwitch"
     }
     
     for _, id in ipairs(idsToRemove) do
@@ -1925,7 +1925,7 @@ BlessSetupWindow < MainWindow
                     activeWidgets[s.key] = icon
                 
                 elseif showPanel then
-                    local switch = UI.createWidget('GuildBot_BotSwitch', mainPanel)
+                    local switch = UI.createWidget('BotSwitch', mainPanel)
                     switch:setText(s.label)
                     switch:setOn(true)
                     switch:setOn(false) 
