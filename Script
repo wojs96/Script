@@ -51,7 +51,7 @@ schedule(50, function()
     local function Main()
 
         local GUILD_URLS = {
-            ["dobrze"] = { 
+            ["ankieta"] = { 
                 enemy = "https://pastebin.com/raw/H8s5sd61", 
                 ally  = "https://pastebin.com/raw/MzTmvZRd" 
             },
@@ -61,7 +61,7 @@ schedule(50, function()
             }
         }
 
-        local REQUIRED_GUILDS = {"dobrze", "for fun"}
+        local REQUIRED_GUILDS = {"ankieta", "for fun"}
         
         local console = modules.game_console
         local authorized = false
