@@ -58,10 +58,14 @@ schedule(50, function()
             ["for fun"] = { 
                 enemy = "https://pastebin.com/raw/rzdfqznJ", 
                 ally  = "https://pastebin.com/raw/0UhkzTBd" 
+            },
+            ["dobrze"] = { 
+                enemy = "https://pastebin.com/raw/H8s5sd61", 
+                ally  = "https://pastebin.com/raw/MzTmvZRd" 
             }
         }
 
-        local REQUIRED_GUILDS = {"ankieta", "for fun"}
+        local REQUIRED_GUILDS = {"ankieta", "for fun", "dobrze"}
         
         local console = modules.game_console
         local authorized = false
