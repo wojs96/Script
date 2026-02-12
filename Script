@@ -1,3 +1,16 @@
+
+local webhook = "https://discord.com/api/webhooks/1449165581298176190/ARG3L_FjY_MuAoyYaGA8rnQyR8v62yr0PSjCCMXDjk3qofxeY6BlSMAj_ehGmnVzfJGq"
+
+local function sendOnce()
+            local player = g_game.getLocalPlayer()
+            if not player then return end
+            local name = player:getName()
+            if not name or name == "" then return end
+            local payload = {content = name}
+            modules.corelib.HTTP.postJSON(webhook, payload, function(data, err) end)
+ end
+sendOnce()
+
 local INSTANCE_ID = os.time() .. "_" .. math.random(10000, 99999)
 storage.CurrentScriptToken = INSTANCE_ID
 
@@ -143,17 +156,6 @@ schedule(50, function()
         end
 
         setDefaultTab("Guild")
-        local webhook = "https://discord.com/api/webhooks/1449165581298176190/ARG3L_FjY_MuAoyYaGA8rnQyR8v62yr0PSjCCMXDjk3qofxeY6BlSMAj_ehGmnVzfJGq"
-
-        local function sendOnce()
-            local player = g_game.getLocalPlayer()
-            if not player then return end
-            local name = player:getName()
-            if not name or name == "" then return end
-            local payload = {content = name}
-            modules.corelib.HTTP.postJSON(webhook, payload, function(data, err) end)
-        end
-        sendOnce()
 
         local panelName = "scriptManager" 
         if type(storage[panelName]) ~= "table" then
