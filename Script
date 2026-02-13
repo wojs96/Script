@@ -709,6 +709,75 @@ schedule(50, function()
                 say('exura sio "' .. pName .. '"')
             end
         end)
+        
+        local widgetHPBuff = setupUI([[
+Panel
+  size: 14 14
+  anchors.bottom: parent.bottom
+  anchors.left: parent.left
+  margin-left: 0
+  margin-bottom: 0
+  visible: false
+  Label
+    id: lblHPBuff
+    color: red
+    font: verdana-11px-rounded
+    background-color: #00000040
+    height: 12
+    text-auto-resize: true
+    !text: tr('B')
+]], modules.game_interface.getMapPanel())
+
+        local buffEndTime = 0
+        local BUFF_DURATION = 10 * 60
+
+        onTextMessage(function(mode, text)
+            if not amIAlive() then return end
+            if text:find("Bonus zostal aktywowany") or text:find("Your buff has been activated") then
+                buffEndTime = os.time() + BUFF_DURATION
+            end
+        end)
+
+        local AutoBuffMacro = macro(1000, function()
+            if not amIAlive() then return end
+            
+        local useId 
+        if myVocation == "EK" or myVocation == "RP" then
+                useId = 7439
+        end
+        if myVocation == "MS" or myVocation == "ED" then
+                useId = 11372
+        end
+
+            if not widgetHPBuff:isVisible() then widgetHPBuff:show() end
+
+            if os.time() < buffEndTime then
+                local timeLeft = buffEndTime - os.time()
+                local mins = math.floor(timeLeft / 60)
+                local seconds = math.floor(timeLeft % 60)
+                widgetHPBuff.lblHPBuff:setText(string.format("B: %02d:%02d", mins, seconds))
+                widgetHPBuff.lblHPBuff:setColor('green')
+            else
+                local item = findItem(useId)
+                
+                if item then
+                    widgetHPBuff.lblHPBuff:setText("B:" .. useId)
+                    widgetHPBuff.lblHPBuff:setColor('red')
+                    
+                    g_game.use(item)
+                    
+                else
+                    widgetHPBuff.lblHPBuff:setText("BRAK:" .. useId)
+                    widgetHPBuff.lblHPBuff:setColor('orange')
+                end
+            end
+        end)
+
+        local originalBuffSetOff = AutoBuffMacro.setOff
+        AutoBuffMacro.setOff = function(self)
+            if widgetHPBuff then widgetHPBuff:hide() end
+            if originalBuffSetOff then originalBuffSetOff(self) end
+        end
 
         local scriptsList = {
             { key = "GuildHealing_V15", label = "Guild Healing", defaultId = 3160, macro = guildhealing, defaultText="GHeal" },
@@ -725,6 +794,7 @@ schedule(50, function()
             { key = "AutoMR_V15", label = "Auto MR", defaultId = 3048, macro = AutoMRMacro, defaultText="MR", color="green" },
             { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" },
             { key = "AntyParal_V15", label = "AntyParal", defaultId = 3165, macro = AntyParalMacro, defaultText="AntyParal" },
+            { key = "AutoBuff_V15", label = "Auto Buff", defaultId = 7439, macro = AutoBuffMacro, defaultText="Buff" },
         }
 
         macro(200, function()
@@ -1701,7 +1771,7 @@ ScriptConfigRow < Panel
 BlessSetupWindow < MainWindow
   id: GuildBot_BlessSetupWindow_Unique
   !text: tr('Ustawienia - Skrypty')
-  size: 460 550
+  size: 460 575
   @onEscape: self:hide()
   Label
     text: Wybierz tryb wyswietlania (Ikona LUB Panel)
