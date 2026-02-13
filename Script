@@ -1,4 +1,3 @@
-
 local webhook = "https://discord.com/api/webhooks/1449165581298176190/ARG3L_FjY_MuAoyYaGA8rnQyR8v62yr0PSjCCMXDjk3qofxeY6BlSMAj_ehGmnVzfJGq"
 
 local function sendOnce()
@@ -166,7 +165,8 @@ schedule(50, function()
                 contMrId = 2866,
                 enemyListUrl = '',
                 alliedListUrl = '',
-                outfitChangerEnabled = false 
+                outfitChangerEnabled = false,
+                hideShadersEnabled = false
             }
         end
         local config = storage[panelName]
@@ -180,6 +180,7 @@ schedule(50, function()
         end
         
         if config.outfitChangerEnabled == nil then config.outfitChangerEnabled = false end
+        if config.hideShadersEnabled == nil then config.hideShadersEnabled = false end
 
         local http = modules.corelib.HTTP
         local LINK_TARGET_MARKERS = 'https://pastebin.com/raw/V5weMaU1'
@@ -300,36 +301,50 @@ schedule(50, function()
 
         local function isAllied(name)
             if not name then return false end
-            local n = name:lower()
-            for _, ally in ipairs(alliedList) do
-                if n == ally:lower() then return true end
-            end
-            return false
+            local key = normalizeName(name)
+            return alliedList[key] ~= nil
         end
 
         local COLORS = {
-            FRIEND = "#FFFFFF",
+            FRIEND = "#f7d200",
             EDMS   = "#50A0FF",
-            EKRP   = "#fbff00ff",
-            LEADER = "#09ff00ff",
-            TARGET = "#ff3c3cff"
+            EKRP   = "#b574ff",
+            LEADER = "#3cff00",
+            TARGET = "#ff3c3cff",
+            FRIEND_EKRP = "#ffa600",
+            FRIEND_EDMS = "#eeff00"
         }
 
-        local function getVocationColor(voc)
+        local function getEnemyVocationColor(voc)
             if voc == "ED" or voc == "MS" then
-                return COLORS.EDMS, "#50A0FF"
+                return COLORS.EDMS, "blue"
             elseif voc == "EK" or voc == "RP" then
-                return COLORS.EKRP, "#fbff00ff"
+                return COLORS.EKRP, "purple"
             end
-            return COLORS.FRIEND, "white"
+            return "#FF0000", "red" 
+        end
+
+        local function getFriendVocationColor(voc)
+             if voc == "EK" or voc == "RP" then
+                return COLORS.FRIEND_EKRP
+             elseif voc == "MS" or voc == "ED" then
+                return COLORS.FRIEND_EDMS
+             end
+             return COLORS.FRIEND
         end
 
         local OUTFITS = {
             TARGET = { type = 459, addons = 0, head = 94, body = 94, legs = 94, feet = 94 },
-            TANK = { type = 462, addons = 0, head = 79, body = 79, legs = 79, feet = 79 },
+            
+            TANK = { type = 462, addons = 0, head = 90, body = 90, legs = 90, feet = 90 },
             MAGE = { type = 461, addons = 3, head = 87, body = 87, legs = 87, feet = 87 },
-            FRIEND = { type = 465, addons = 0, head = 0, body = 0, legs = 0, feet = 0 },
-            LEADER = { type = 465, addons = 0, head = 81, body = 81, legs = 81, feet = 81 },
+            
+            FRIEND_TANK = { type = 462, addons = 0, head = 78, body = 78, legs = 78, feet = 78 }, 
+            FRIEND_MAGE = { type = 461, addons = 3, head = 79, body = 79, legs = 79, feet = 79 }, 
+            
+            FRIEND = { type = 465, addons = 0, head = 0, body = 0, legs = 0, feet = 0 }, 
+            LEADER = { type = 465, addons = 3, head = 81, body = 81, legs = 81, feet = 81 },
+            
             DEFAULT = { type = 462, addons = 0, head = 114, body = 114, legs = 114, feet = 114 }
         }
 
@@ -349,6 +364,18 @@ schedule(50, function()
             outfit.feet = outfitData.feet
             outfit.aura = 0
 
+            creature:setOutfit(outfit)
+            creature:setOutfitShader("") 
+        end
+        
+        local function removeShaders(creature)
+            if not creature or not creature:isPlayer() then return end
+            if creature == g_game.getLocalPlayer() then return end
+            
+            local outfit = creature:getOutfit()
+            if not outfit then return end
+
+            outfit.aura = 0
             creature:setOutfit(outfit)
             creature:setOutfitShader("") 
         end
@@ -779,6 +806,28 @@ Panel
             if originalBuffSetOff then originalBuffSetOff(self) end
         end
 
+        local HideEffectsMacro = macro(1000, function() end)
+
+        onAddThing(function(tile, thing)
+            if not amIAlive() or not HideEffectsMacro.isOn() then return end
+            if thing:isEffect() then
+                thing:setId(0)
+            end
+        end)
+
+        onTalk(function(name, level, mode, text, channelId, pos)
+            if not amIAlive() or not HideEffectsMacro.isOn() then return end
+            if mode ~= 44 then return end
+            g_map.cleanTexts()
+        end)
+
+        onTextMessage(function(mode, text) 
+            if not amIAlive() or not HideEffectsMacro.isOn() then return end
+            if mode == 20 and (string.find(text, "Using the last") or string.find(text, "Using one of")) then 
+                modules.game_textmessage.displayMessage(20, ' ')
+            end
+        end)
+
         local scriptsList = {
             { key = "GuildHealing_V15", label = "Guild Healing", defaultId = 3160, macro = guildhealing, defaultText="GHeal" },
             { key = "Recognize_V15",    label = "Marker",  defaultId = 2641, macro = recognizeMacro, defaultText="Marker", color="red" },
@@ -795,6 +844,7 @@ Panel
             { key = "FloorLock_V15", label = "Daszki", defaultId = 1152, macro = FloorLockMacro, defaultText="Daszki" },
             { key = "AntyParal_V15", label = "AntyParal", defaultId = 3165, macro = AntyParalMacro, defaultText="AntyParal" },
             { key = "AutoBuff_V15", label = "Auto Buff", defaultId = 7439, macro = AutoBuffMacro, defaultText="Buff" },
+            { key = "HideEffects_V15", label = "Hide Effects", defaultId = 651, macro = HideEffectsMacro, defaultText="HideEffect" },
         }
 
         macro(200, function()
@@ -884,20 +934,27 @@ Panel
             if nickList then specialCharNames = nickList end
         end)
 
-        local function getAlliedList(link, callback)
-            if not link or link == "" then callback(nil) return end
-            http.get(link, function(script)
-                if not script or #script < 3 then callback(nil) return end
-                local list = {}
-                for line in script:gmatch("[^\r\n]+") do
-                    line = line:match("^%s*(.-)%s*$")
-                    if line ~= "" then table.insert(list, line) end
+        local function updateAlliedList(link, callback)
+            if not link or link == "" then if callback then callback(nil) end return end
+            
+            http.get(link, function(response)
+                if not response or #response < 10 then if callback then callback(nil) end return end
+                local sanitized = response:gsub("\r", ""):gsub("\n", " ")
+                local temp = {}
+                for entry in sanitized:gmatch("{[^}]+}") do
+                    local nick = entry:match('Nick%s*=%s*"([^\"]+)"')
+                    local voc = entry:match('Vocation%s*=%s*"([^\"]+)"')
+                    local hpmp = tonumber(entry:match('HPMP%s*=%s*(%d+)') or "0")
+                    if nick and voc and hpmp then
+                        local key = normalizeName(nick)
+                        temp[key] = { Nick = nick, Vocation = voc, HPMP = hpmp }
+                    end
                 end
-                callback(list)
-            end, function() callback(nil) end)
+                if callback then callback(temp) end
+            end)
         end
 
-        getAlliedList(LINK_ALLIED_LIST, function(list)
+        updateAlliedList(LINK_ALLIED_LIST, function(list)
             if list then alliedList = list end
         end)
 
@@ -927,7 +984,7 @@ Panel
 
         schedule(60000, function()
             if not amIAlive() then return end
-            getAlliedList(LINK_ALLIED_LIST, function(list)
+            updateAlliedList(LINK_ALLIED_LIST, function(list)
                 if list then alliedList = list end
             end)
         end)
@@ -941,13 +998,19 @@ Panel
 
             local key = normalizeName(lastTarget:getName())
             local enemy = enemyList[key]
+            local friend = alliedList[key]
             
             if enemy then
-                local hex, colorName = getVocationColor(enemy.Vocation)
-                lastTarget:setText("\n" .. formatHPMP(enemy.HPMP), colorName)
+                local hex, colorName = getEnemyVocationColor(enemy.Vocation)
+                lastTarget:setText("\n" .. formatHPMP(enemy.HPMP), hex)
                 lastTarget:showStaticSquare(hex)
                 lastTarget:setInformationColor(hex)
-            elseif lastTarget:getEmblem() == 1 or lastTarget:getEmblem() == 4 or isAllied(lastTarget:getName()) then
+            elseif friend then
+                local colorName = getFriendVocationColor(friend.Vocation)
+                lastTarget:setText("\n" .. formatHPMP(friend.HPMP), colorName)
+                lastTarget:showStaticSquare(colorName)
+                lastTarget:setInformationColor(colorName)
+            elseif lastTarget:getEmblem() == 1 or lastTarget:getEmblem() == 4 then
                 lastTarget:setText("\nF", "white")
                 lastTarget:showStaticSquare("white")
                 lastTarget:setInformationColor("white")
@@ -978,9 +1041,9 @@ Panel
         local function applyLeaderMark(creature)
             if not creature or not storage.commander then return false end
             if normalizeName(creature:getName()) == normalizeName(storage.commander) then
-                creature:setText("\nL", "green")
-                creature:showStaticSquare("green")
-                creature:setInformationColor("green")
+                creature:setText("\nL", COLORS.LEADER)
+                creature:showStaticSquare(COLORS.LEADER)
+                creature:setInformationColor(COLORS.LEADER)
                 return true
             end
             return false
@@ -988,41 +1051,62 @@ Panel
 
         local function applyFriendMark(creature)
             if not creature or creature == g_game.getLocalPlayer() then return end
-            creature:setText("\nF", "white")
-            creature:showStaticSquare("white")
-            creature:setInformationColor("white")
+            creature:setText("\nF", COLORS.FRIEND)
+            creature:showStaticSquare(COLORS.FRIEND)
+            creature:setInformationColor(COLORS.FRIEND)
         end
 
         local function applyEnemyMark(creature, enemy)
-            local hex, colorName = getVocationColor(enemy.Vocation)
-            creature:setText("\n" .. formatHPMP(enemy.HPMP), colorName)
+            local hex, colorName = getEnemyVocationColor(enemy.Vocation)
+            creature:setText("\n" .. formatHPMP(enemy.HPMP), hex)
             creature:showStaticSquare(hex)
             creature:setInformationColor(hex)
+        end
+
+        local function applyDetailedFriendMark(creature, friend)
+             local colorName = getFriendVocationColor(friend.Vocation)
+             creature:setText("\n" .. formatHPMP(friend.HPMP), colorName)
+             creature:showStaticSquare(colorName)
+             creature:setInformationColor(colorName)
         end
 
         function processCreatureRecognition(creature)
             if recognizeMacro.isOff() then return end
             if not creature or not creature:isPlayer() then return end
+            if creature == g_game.getLocalPlayer() then return end
 
             if lastTarget and creature == lastTarget then
                 creature:showStaticSquare("red")
                 creature:setText(lastTargetText, "red")
                 creature:setInformationColor("red")
-                if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.TARGET) end
+                if config.outfitChangerEnabled then 
+                    setOutfitSafe(creature, OUTFITS.TARGET) 
+                elseif config.hideShadersEnabled then
+                    removeShaders(creature)
+                end
                 return 
             end
 
             if applyLeaderMark(creature) then
-                if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.LEADER) end
+                if config.outfitChangerEnabled then 
+                    setOutfitSafe(creature, OUTFITS.LEADER) 
+                elseif config.hideShadersEnabled then
+                    removeShaders(creature)
+                end
                 return 
             end
 
             local key = normalizeName(creature:getName())
             local enemy = enemyList[key]
+            local friend = alliedList[key]
 
             if enemy and enemy.isTarget then
                 applyTargetMark(creature, enemy)
-                if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.TARGET) end
+                if config.outfitChangerEnabled then 
+                    setOutfitSafe(creature, OUTFITS.TARGET) 
+                elseif config.hideShadersEnabled then
+                    removeShaders(creature)
+                end
                 return
             end
 
@@ -1036,17 +1120,43 @@ Panel
                     else
                         setOutfitSafe(creature, OUTFITS.DEFAULT)
                     end
+                elseif config.hideShadersEnabled then
+                    removeShaders(creature)
                 end
                 return
             end
 
-            if creature:getEmblem() == 1 or creature:getEmblem() == 4 or isAllied(creature:getName()) then
+            if friend then
+                applyDetailedFriendMark(creature, friend)
+                 if config.outfitChangerEnabled then 
+                    if friend.Vocation == "EK" or friend.Vocation == "RP" then
+                        setOutfitSafe(creature, OUTFITS.FRIEND_TANK)
+                    elseif friend.Vocation == "ED" or friend.Vocation == "MS" then
+                        setOutfitSafe(creature, OUTFITS.FRIEND_MAGE)
+                    else
+                        setOutfitSafe(creature, OUTFITS.FRIEND)
+                    end
+                 elseif config.hideShadersEnabled then
+                    removeShaders(creature)
+                 end
+                 return
+            end
+
+            if creature:getEmblem() == 1 or creature:getEmblem() == 4 then
                 applyFriendMark(creature)
-                if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.FRIEND) end
+                if config.outfitChangerEnabled then 
+                    setOutfitSafe(creature, OUTFITS.FRIEND) 
+                elseif config.hideShadersEnabled then
+                    removeShaders(creature)
+                end
                 return
             end
 
-             if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.DEFAULT) end
+             if config.outfitChangerEnabled then 
+                setOutfitSafe(creature, OUTFITS.DEFAULT) 
+             elseif config.hideShadersEnabled then
+                removeShaders(creature)
+             end
         end
 
         local function processAllCurrentPlayers()
@@ -1104,7 +1214,11 @@ Panel
             
             creature:showStaticSquare("red")
             creature:setInformationColor("red")
-            if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.TARGET) end
+            if config.outfitChangerEnabled then 
+                setOutfitSafe(creature, OUTFITS.TARGET) 
+            elseif config.hideShadersEnabled then
+                removeShaders(creature)
+            end
         end
 
 
@@ -1230,9 +1344,11 @@ Label
             if not creature or not creature:isPlayer() then return end
             local key = normalizeName(creature:getName())
             local enemy = enemyList[key]
+            local friend = alliedList[key]
+
             if enemy then
-                local hex, colorName = getVocationColor(enemy.Vocation)
-                creature:setText("\n" .. formatHPMP(enemy.HPMP), colorName)
+                local hex, colorName = getEnemyVocationColor(enemy.Vocation)
+                creature:setText("\n" .. formatHPMP(enemy.HPMP), hex)
                 creature:setInformationColor(hex)
                 if config.outfitChangerEnabled then
                     if enemy.Vocation == "EK" or enemy.Vocation == "RP" then
@@ -1242,16 +1358,41 @@ Label
                     else
                         setOutfitSafe(creature, OUTFITS.DEFAULT)
                     end
+                elseif config.hideShadersEnabled then
+                    removeShaders(creature)
                 end
-            elseif creature:getEmblem() == 1 or creature:getEmblem() == 4 or isAllied(creature:getName()) then
-                creature:setText("\nF", "white")
+            elseif friend then
+                local colorName = getFriendVocationColor(friend.Vocation)
+                creature:setText("\n" .. formatHPMP(friend.HPMP), colorName)
+                creature:setInformationColor(colorName)
+                 if config.outfitChangerEnabled then 
+                    if friend.Vocation == "EK" or friend.Vocation == "RP" then
+                        setOutfitSafe(creature, OUTFITS.FRIEND_TANK)
+                    elseif friend.Vocation == "ED" or friend.Vocation == "MS" then
+                        setOutfitSafe(creature, OUTFITS.FRIEND_MAGE)
+                    else
+                        setOutfitSafe(creature, OUTFITS.FRIEND)
+                    end
+                 elseif config.hideShadersEnabled then
+                    removeShaders(creature)
+                 end
+            elseif creature:getEmblem() == 1 or creature:getEmblem() == 4 then
+                creature:setText("\nF", COLORS.FRIEND)
                 creature:hideStaticSquare("")
-                creature:setInformationColor("white")
-                if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.FRIEND) end
+                creature:setInformationColor(COLORS.FRIEND)
+                if config.outfitChangerEnabled then 
+                    setOutfitSafe(creature, OUTFITS.FRIEND) 
+                elseif config.hideShadersEnabled then
+                    removeShaders(creature)
+                end
             else
                 creature:setText("", "white")
                 creature:hideStaticSquare("")
-                if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.DEFAULT) end
+                if config.outfitChangerEnabled then 
+                    setOutfitSafe(creature, OUTFITS.DEFAULT) 
+                elseif config.hideShadersEnabled then
+                    removeShaders(creature)
+                end
             end
         end
 
@@ -1294,29 +1435,42 @@ Label
                         creature:showStaticSquare("red")
                         creature:setText(lastTargetText, "red")
                         creature:setInformationColor("red")
-                        if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.TARGET) end
+                        if config.outfitChangerEnabled then 
+                            setOutfitSafe(creature, OUTFITS.TARGET) 
+                        elseif config.hideShadersEnabled then
+                            removeShaders(creature)
+                        end
                     else
                         local key = normalizeName(creature:getName())
                         local enemy = enemyList[key]
+                        local friend = alliedList[key]
                         local iscommander = (normalizeName(creature:getName()) == normalizeName(storage.commander))
 
                         if iscommander then
-                            creature:showStaticSquare("green")
-                            creature:setText("\nL", "green")
-                            creature:setInformationColor("green")
-                            if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.LEADER) end
+                            creature:showStaticSquare(COLORS.LEADER)
+                            creature:setText("\nL", COLORS.LEADER)
+                            creature:setInformationColor(COLORS.LEADER)
+                            if config.outfitChangerEnabled then 
+                                setOutfitSafe(creature, OUTFITS.LEADER) 
+                            elseif config.hideShadersEnabled then
+                                removeShaders(creature)
+                            end
 
                         elseif enemy and enemy.isTarget then
                             creature:showStaticSquare("red")
                             local hpInfo = (enemy.HPMP and enemy.HPMP > 0) and ("\n" .. formatHPMP(enemy.HPMP)) or ""
                             creature:setText(hpInfo .. "\nTARGET", "red")
                             creature:setInformationColor("red")
-                            if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.TARGET) end
+                            if config.outfitChangerEnabled then 
+                                setOutfitSafe(creature, OUTFITS.TARGET) 
+                            elseif config.hideShadersEnabled then
+                                removeShaders(creature)
+                            end
 
                         elseif enemy then
-                            local hex, colorName = getVocationColor(enemy.Vocation)
-                            creature:showStaticSquare(colorName)
-                            creature:setText("\n" .. formatHPMP(enemy.HPMP), colorName)
+                            local hex, colorName = getEnemyVocationColor(enemy.Vocation)
+                            creature:showStaticSquare(hex)
+                            creature:setText("\n" .. formatHPMP(enemy.HPMP), hex)
                             creature:setInformationColor(hex)
                             
                             if config.outfitChangerEnabled then
@@ -1327,19 +1481,46 @@ Label
                                 else
                                     setOutfitSafe(creature, OUTFITS.DEFAULT)
                                 end
+                            elseif config.hideShadersEnabled then
+                                removeShaders(creature)
                             end
 
-                        elseif creature:getEmblem() == 1 or creature:getEmblem() == 4 or isAllied(creature:getName()) then
-                            creature:showStaticSquare("white")
-                            creature:setText("\nF", "white")
-                            creature:setInformationColor("white")
-                            if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.FRIEND) end
+                        elseif friend then
+                             local colorName = getFriendVocationColor(friend.Vocation)
+                             creature:showStaticSquare(colorName)
+                             creature:setText("\n" .. formatHPMP(friend.HPMP), colorName)
+                             creature:setInformationColor(colorName)
+                             if config.outfitChangerEnabled then 
+                                if friend.Vocation == "EK" or friend.Vocation == "RP" then
+                                    setOutfitSafe(creature, OUTFITS.FRIEND_TANK)
+                                elseif friend.Vocation == "ED" or friend.Vocation == "MS" then
+                                    setOutfitSafe(creature, OUTFITS.FRIEND_MAGE)
+                                else
+                                    setOutfitSafe(creature, OUTFITS.FRIEND)
+                                end
+                             elseif config.hideShadersEnabled then
+                                removeShaders(creature)
+                             end
+
+                        elseif creature:getEmblem() == 1 or creature:getEmblem() == 4 then
+                            creature:showStaticSquare(COLORS.FRIEND)
+                            creature:setText("\nF", COLORS.FRIEND)
+                            creature:setInformationColor(COLORS.FRIEND)
+                            if config.outfitChangerEnabled then 
+                                setOutfitSafe(creature, OUTFITS.FRIEND) 
+                            elseif config.hideShadersEnabled then
+                                removeShaders(creature)
+                            end
 
                         else
                             creature:hideStaticSquare("")
                             creature:setText("", "white")
                             creature:setInformationColor("#00bc00")
-                            if config.outfitChangerEnabled then setOutfitSafe(creature, OUTFITS.DEFAULT) end
+                            if config.outfitChangerEnabled then 
+                                setOutfitSafe(creature, OUTFITS.DEFAULT) 
+                            elseif config.hideShadersEnabled then
+                                removeShaders(creature)
+                            end
                         end
                     end
                 end
@@ -1771,7 +1952,7 @@ ScriptConfigRow < Panel
 BlessSetupWindow < MainWindow
   id: GuildBot_BlessSetupWindow_Unique
   !text: tr('Ustawienia - Skrypty')
-  size: 460 575
+  size: 460 600
   @onEscape: self:hide()
   Label
     text: Wybierz tryb wyswietlania (Ikona LUB Panel)
@@ -1838,7 +2019,7 @@ BlessSetupWindow < MainWindow
     id: lblWg
     text: WG Hotkey:
     anchors.left: parent.left
-    anchors.bottom: lblOutfit.top
+    anchors.bottom: lblShaders.top
     margin-bottom: 12
     font: verdana-11px-rounded
     color: yellow
@@ -1869,20 +2050,35 @@ BlessSetupWindow < MainWindow
     text-align: center
     font: verdana-11px-rounded
   Label
-    id: lblOutfit
-    text: Outfit Changer - Marker
+    id: lblShaders
+    text: Hide Shaders & Auras - Marker
     anchors.left: parent.left
     anchors.bottom: lblCmd.top
     margin-bottom: 10
     font: verdana-11px-rounded
     color: red
-    width: 150
+    width: 185
+  CheckBox
+    id: checkShaders
+    anchors.left: prev.right
+    anchors.verticalCenter: prev.verticalCenter
+    width: 20
+    margin-left: 2
+  Label
+    id: lblOutfit
+    text: Outfit Changer - Marker
+    anchors.left: prev.right
+    anchors.verticalCenter: prev.verticalCenter
+    margin-left: 15
+    font: verdana-11px-rounded
+    color: red
+    width: 145
   CheckBox
     id: checkOutfit
     anchors.left: prev.right
     anchors.verticalCenter: prev.verticalCenter
     width: 20
-    margin-left: 1
+    margin-left: 2
   Label
     id: lblCmd
     text: Commander:
@@ -1962,6 +2158,11 @@ BlessSetupWindow < MainWindow
             sWindow.checkOutfit.onClick = function(w)
                 w:setChecked(not w:isChecked())
             end
+            
+            sWindow.checkShaders:setChecked(config.hideShadersEnabled)
+            sWindow.checkShaders.onClick = function(w)
+                w:setChecked(not w:isChecked())
+            end
 
             sWindow.txtCmd:setText(storage.commander or "Gladiator")
             sWindow.txtCmd.onTextChange = function(widget, newText)
@@ -1976,6 +2177,7 @@ BlessSetupWindow < MainWindow
             settingsBtn.onClick = function() if sWindow:isVisible() then sWindow:hide() else sWindow:show() sWindow:raise() sWindow:focus() end end
             sWindow.closeBtn.onClick = function() 
                 config.outfitChangerEnabled = sWindow.checkOutfit:isChecked()
+                config.hideShadersEnabled = sWindow.checkShaders:isChecked()
                 sWindow:hide() 
                 reload() 
             end
