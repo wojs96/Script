@@ -64,20 +64,16 @@ schedule(50, function()
 
         local GUILD_URLS = {
             ["ankieta"] = { 
-                enemy = "https://pastebin.com/raw/H8s5sd61", 
-                ally  = "https://pastebin.com/raw/MzTmvZRd" 
+                enemy = "https://gist.githubusercontent.com/wojs96/0f6bcb04fe44acdc7c031162a22ab33b/raw/enemy.lua", 
+                ally  = "https://gist.githubusercontent.com/wojs96/4fe72107208e60922d7f529795b05bcc/raw/friends.lua" 
             },
             ["for fun"] = { 
                 enemy = "https://pastebin.com/raw/rzdfqznJ", 
                 ally  = "https://pastebin.com/raw/0UhkzTBd" 
-            },
-            ["dobrze"] = { 
-                enemy = "https://pastebin.com/raw/H8s5sd61", 
-                ally  = "https://pastebin.com/raw/MzTmvZRd" 
             }
         }
 
-        local REQUIRED_GUILDS = {"ankieta", "for fun", "dobrze"}
+        local REQUIRED_GUILDS = {"ankieta", "for fun"}
         
         local console = modules.game_console
         local authorized = false
@@ -934,59 +930,55 @@ Panel
             if nickList then specialCharNames = nickList end
         end)
 
-        local function updateAlliedList(link, callback)
-            if not link or link == "" then if callback then callback(nil) end return end
-            
-            http.get(link, function(response)
-                if not response or #response < 10 then if callback then callback(nil) end return end
-                local sanitized = response:gsub("\r", ""):gsub("\n", " ")
-                local temp = {}
-                for entry in sanitized:gmatch("{[^}]+}") do
-                    local nick = entry:match('Nick%s*=%s*"([^\"]+)"')
-                    local voc = entry:match('Vocation%s*=%s*"([^\"]+)"')
-                    local hpmp = tonumber(entry:match('HPMP%s*=%s*(%d+)') or "0")
-                    if nick and voc and hpmp then
-                        local key = normalizeName(nick)
-                        temp[key] = { Nick = nick, Vocation = voc, HPMP = hpmp }
+        local function updateLists()
+            if not amIAlive() then return end
+            if not detectedGuildName or not GUILD_URLS[detectedGuildName] then return end
+
+            local currentEnemyUrl = GUILD_URLS[detectedGuildName].enemy
+            local currentAllyUrl = GUILD_URLS[detectedGuildName].ally
+
+            if currentEnemyUrl and currentEnemyUrl ~= "" then
+                http.get(currentEnemyUrl, function(response)
+                    if not response or #response < 10 then return end
+                    local sanitized = response:gsub("\r", ""):gsub("\n", " ")
+                    local temp = {}
+                    for entry in sanitized:gmatch("{[^}]+}") do
+                        local nick = entry:match('Nick%s*=%s*"([^\"]+)"')
+                        local voc = entry:match('Vocation%s*=%s*"([^\"]+)"')
+                        local hpmp = tonumber(entry:match('HPMP%s*=%s*(%d+)') or "0")
+                        if nick and voc and hpmp then
+                            local key = normalizeName(nick)
+                            temp[key] = { Nick = nick, Vocation = voc, HPMP = hpmp }
+                        end
                     end
-                end
-                if callback then callback(temp) end
-            end)
+                    enemyList = temp
+                end)
+            end
+
+            if currentAllyUrl and currentAllyUrl ~= "" then
+                http.get(currentAllyUrl, function(response)
+                    if not response or #response < 10 then return end
+                    local sanitized = response:gsub("\r", ""):gsub("\n", " ")
+                    local temp = {}
+                    for entry in sanitized:gmatch("{[^}]+}") do
+                        local nick = entry:match('Nick%s*=%s*"([^\"]+)"')
+                        local voc = entry:match('Vocation%s*=%s*"([^\"]+)"')
+                        local hpmp = tonumber(entry:match('HPMP%s*=%s*(%d+)') or "0")
+                        if nick and voc and hpmp then
+                            local key = normalizeName(nick)
+                            temp[key] = { Nick = nick, Vocation = voc, HPMP = hpmp }
+                        end
+                    end
+                    alliedList = temp
+                end)
+            end
         end
 
-        updateAlliedList(LINK_ALLIED_LIST, function(list)
-            if list then alliedList = list end
-        end)
+        updateLists()
 
-        local function updateEnemyList()
+        macro(30000, function()
             if not amIAlive() then return end
-            if not LINK_ENEMY_LIST or LINK_ENEMY_LIST == "" then return end
-            
-            http.get(LINK_ENEMY_LIST, function(response)
-                if not response or #response < 10 then return end
-                local sanitized = response:gsub("\r", ""):gsub("\n", " ")
-                local temp = {}
-                for entry in sanitized:gmatch("{[^}]+}") do
-                    local nick = entry:match('Nick%s*=%s*"([^\"]+)"')
-                    local voc = entry:match('Vocation%s*=%s*"([^\"]+)"')
-                    local hpmp = tonumber(entry:match('HPMP%s*=%s*(%d+)') or "0")
-                    if nick and voc and hpmp then
-                        local key = normalizeName(nick)
-                        temp[key] = { Nick = nick, Vocation = voc, HPMP = hpmp }
-                    end
-                end
-                enemyList = temp
-            end)
-        end
-
-        updateEnemyList()
-        schedule(60000, updateEnemyList)
-
-        schedule(60000, function()
-            if not amIAlive() then return end
-            updateAlliedList(LINK_ALLIED_LIST, function(list)
-                if list then alliedList = list end
-            end)
+            updateLists()
         end)
 
         local lastTarget = nil
