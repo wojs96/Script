@@ -1,0 +1,341 @@
+-- =====================================================================
+-- UNIWERSALNY SKRYPT EXIVA (5K + 4K + WALERIAN) Z POBIERANIEM Z GISTA
+-- =====================================================================
+
+local ENEMY_URL = "https://gist.githubusercontent.com/wojs96/0f6bcb04fe44acdc7c031162a22ab33b/raw/enemy.lua"
+
+local webhook_exiva = "https://discord.com/api/webhooks/1473048733724704984/8ehbor3I4UbZSO4MksrUUmvkb3VbaAbalnyxzPjCKSkuBDIkuW85L4OursI00Ge_83eD"
+
+local PZexiva = {}
+local enemiesexiva = {}
+
+-- Pobieranie listy z Gista
+local function fetchEnemyList()
+    modules.corelib.HTTP.get(ENEMY_URL, function(response)
+        if not response or string.len(response) < 10 then return end
+        local sanitized = response:gsub("\r", ""):gsub("\n", " ")
+        local tempEnemies = {}
+        for entry in sanitized:gmatch("{[^}]+}") do
+            local nick = entry:match('Nick%s*=%s*"([^\"]+)"')
+            if nick then
+                table.insert(tempEnemies, nick:match("^%s*(.-)%s*$"))
+            end
+        end
+        PZexiva = tempEnemies
+        print("[Uniwersalna Exiva] Pobrano liste graczy: " .. #PZexiva)
+    end)
+end
+
+-- Aktualizacja listy co 5 minut
+fetchEnemyList()
+macro(300000, function() fetchEnemyList() end)
+
+-- Połączona lista lokacji z przypisanym Webhookiem
+local locations = {
+    -- 5K Olimpus
+    {name = "[5K - Olimpus] Piaskal Prawo Channel 1", x = 3812, y = 3824, z = 5, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Piaskal Prawo Channel 2", x = 403, y = 11747, z = 5, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Piaskal Prawo Channel 3", x = 740, y = 11764, z = 5, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Plaga Prawo Channel 1", x = 3840, y = 4013, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Plaga Prawo Channel 2", x = 498, y = 12546, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Plaga Prawo Channel 3", x = 665, y = 12539, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Terrormite Prawo Channel 1", x = 3613, y = 3985, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Terrormite Prawo Channel 2", x = 464, y = 13172, z = 6, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Terrormite Prawo Channel 3", x = 678, y = 13169, z = 6, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Piaskal Lewo Channel 1", x = 4029, y = 4010, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Piaskal Lewo Channel 2", x = 455, y = 12144, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Piaskal Lewo Channel 3", x = 616, y = 12144, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Plaga Lewo Channel 1", x = 4245, y = 4392, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Plaga Lewo Channel 2", x = 487, y = 13061, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Plaga Lewo Channel 3", x = 746, y = 13068, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Terrormite Lewo Channel 1", x = 3698, y = 4182, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Terrormite Lewo Channel 2", x = 613, y = 12708, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Terrormite Lewo Channel 3", x = 381, y = 12704, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Szeloba Lewo Channel 1", x = 959, y = 2910, z = 6, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Szeloba Lewo Channel 2", x = 474, y = 12352, z = 6, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Szeloba Lewo Channel 3", x = 683, y = 12350, z = 6, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Szeloba Dol Channel 1", x = 3900, y = 2078, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Szeloba Dol Channel 2", x = 816, y = 11598, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Szeloba Dol Channel 3", x = 680, y = 11590, z = 7, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Szeloba Prawo Channel 1", x = 1137, y = 2904, z = 6, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Szeloba Prawo Channel 2", x = 427, y = 11951, z = 6, webhook = webhook_exiva},
+    {name = "[5K - Olimpus] Szeloba Prawo Channel 3", x = 613, y = 11945, z = 6, webhook = webhook_exiva},
+    
+    -- 4K Dekane
+    {name = "[4K - Dekane] Troug 1 Channel 1", x = 1122, y = 2743, z = 6, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Troug 1 Channel 2", x = 380, y = 10409, z = 5, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Troug 1 Channel 3", x = 166, y = 10407, z = 5, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Troug 2 Channel 1", x = 4595, y = 3584, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Troug 2 Channel 2", x = 439, y = 10750, z = 6, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Troug 2 Channel 3", x = 205, y = 10747, z = 6, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Troug 3 Channel 1", x = 4162, y = 3419, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Troug 3 Channel 2", x = 142, y = 10654, z = 6, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Troug 3 Channel 3", x = 319, y = 10655, z = 6, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Troug 4 Channel 1", x = 931, y = 2742, z = 6, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Troug 4 Channel 2", x = 343, y = 10241, z = 5, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Troug 4 Channel 3", x = 151, y = 10243, z = 5, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Szafirowy Prawo Channel 1", x = 4834, y = 3143, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Szafirowy Prawo Channel 2", x = 1134, y = 11087, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Szafirowy Prawo Channel 3", x = 1274, y = 11088, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Flubber Prawo Channel 1", x = 4599, y = 4119, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Flubber Prawo Channel 2", x = 333, y = 11553, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Flubber Prawo Channel 3", x = 508, y = 11553, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Flubber Lewo Channel 1", x = 4598, y = 3998, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Flubber Lewo Channel 2", x = 1203, y = 11668, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Flubber Lewo Channel 3", x = 1376, y = 11668, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Szafirowy Lewo Channel 1", x = 4884, y = 3454, z = 6, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Szafirowy Lewo Channel 2", x = 1191, y = 10790, z = 6, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Szafirowy Lewo Channel 3", x = 1390, y = 10793, z = 6, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Drzewiec 1 Channel 1", x = 4583, y = 3807, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Drzewiec 1 Channel 2", x = 1228, y = 11468, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Drzewiec 1 Channel 3", x = 1476, y = 11471, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Drzewiec 2 Channel 1", x = 4230, y = 4127, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Drzewiec 2 Channel 2", x = 608, y = 11443, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Drzewiec 2 Channel 3", x = 279, y = 11445, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Wodnik 1 Channel 1", x = 4324, y = 3793, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Wodnik 1 Channel 2", x = 1186, y = 11264, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Wodnik 1 Channel 3", x = 1353, y = 11264, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Wodnik 2 Channel 1", x = 4185, y = 3885, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Wodnik 2 Channel 2", x = 1231, y = 10963, z = 7, webhook = webhook_exiva},
+    {name = "[4K - Dekane] Wodnik 2 Channel 3", x = 1423, y = 10957, z = 7, webhook = webhook_exiva},
+
+    -- Walerian
+    {name = "Hrimtur 1 Channel 1", x = 1514, y = 2676, z = 7, webhook = webhook_exiva},
+    {name = "Hrimtur 1 Channel 2", x = 5600, y = 4796, z = 7, webhook = webhook_exiva},
+    {name = "Hrimtur 1 Channel 3", x = 5867, y = 4804, z = 7, webhook = webhook_exiva},
+    {name = "Hrimtur 2 Channel 1", x = 979, y = 3088, z = 6, webhook = webhook_exiva},
+    {name = "Hrimtur 2 Channel 2", x = 1437, y = 9470, z = 6, webhook = webhook_exiva},
+    {name = "Hrimtur 2 Channel 3", x = 1229, y = 9473, z = 6, webhook = webhook_exiva},
+    {name = "Wendigo 1 Channel 1", x = 4973, y = 2927, z = 7, webhook = webhook_exiva},
+    {name = "Wendigo 1 Channel 2", x = 1157, y = 10089, z = 7, webhook = webhook_exiva},
+    {name = "Wendigo 1 Channel 3", x = 1377, y = 10081, z = 7, webhook = webhook_exiva},
+    {name = "Wendigo 2 Channel 1", x = 4970, y = 2717, z = 7, webhook = webhook_exiva},
+    {name = "Wendigo 2 Channel 2", x = 1167, y = 9877, z = 7, webhook = webhook_exiva},
+    {name = "Wendigo 2 Channel 3", x = 1391, y = 9874, z = 7, webhook = webhook_exiva},
+    {name = "Widz 1 Prawo Channel 1", x = 4780, y = 2726, z = 7, webhook = webhook_exiva},
+    {name = "Widz 1 Prawo Channel 2", x = 872, y = 11001, z = 6, webhook = webhook_exiva},
+    {name = "Widz 1 Prawo Channel 3", x = 686, y = 11005, z = 6, webhook = webhook_exiva},
+    {name = "Widz 2 Prawo Channel 1", x = 4782, y = 2888, z = 7, webhook = webhook_exiva},
+    {name = "Widz 2 Prawo Channel 2", x = 680, y = 10864, z = 6, webhook = webhook_exiva},
+    {name = "Widz 2 Prawo Channel 3", x = 874, y = 10863, z = 6, webhook = webhook_exiva},
+    {name = "Bang Prawo Channel 1", x = 1722, y = 494, z = 7, webhook = webhook_exiva},
+    {name = "Bang Prawo Channel 2", x = 1245, y = 10572, z = 7, webhook = webhook_exiva},
+    {name = "Bang Prawo Channel 3", x = 1384, y = 10571, z = 7, webhook = webhook_exiva},
+    {name = "Bang Gora Channel 1", x = 3685, y = 2099, z = 7, webhook = webhook_exiva},
+    {name = "Bang Gora Channel 2", x = 1227, y = 10296, z = 7, webhook = webhook_exiva},
+    {name = "Bang Gora Channel 3", x = 1464, y = 10296, z = 7, webhook = webhook_exiva},
+    {name = "Bang Lewo Channel 1", x = 3649, y = 2286, z = 7, webhook = webhook_exiva},
+    {name = "Bang Lewo Channel 2", x = 1208, y = 10456, z = 6, webhook = webhook_exiva},
+    {name = "Bang Lewo Channel 3", x = 1402, y = 10455, z = 6, webhook = webhook_exiva},
+    {name = "Widz 2 Lewo Channel 1", x = 1102, y = 2598, z = 6, webhook = webhook_exiva},
+    {name = "Widz 2 Lewo Channel 2", x = 925, y = 10738, z = 6, webhook = webhook_exiva},
+    {name = "Widz 2 Lewo Channel 3", x = 731, y = 10737, z = 6, webhook = webhook_exiva},
+    {name = "Widz 1 Lewo Channel 1", x = 923, y = 2589, z = 6, webhook = webhook_exiva},
+    {name = "Widz 1 Lewo Channel 2", x = 732, y = 10567, z = 5, webhook = webhook_exiva},
+    {name = "Widz 1 Lewo Channel 3", x = 913, y = 10567, z = 5, webhook = webhook_exiva}
+}
+
+local currentChannel = 1
+
+onWalk(function(player, newPos, oldPos)
+  if player:getName() ~= g_game.getLocalPlayer():getName() then return end
+  local playerTile = g_map.getTile(newPos)
+  for _, item in ipairs(playerTile:getItems()) do
+    if item:getId() == 1722 then
+      schedule(500, function()
+        local root = g_ui.getRootWidget()
+        local channelsWidget = root:recursiveGetChildById("channels")
+        if not channelsWidget then return end
+        local channels = channelsWidget:getChildren()
+        if #channels > 0 then
+          channelsWidget:focusChild(channelsWidget:getChildByIndex(currentChannel))
+          local function findJoinButtonByLabel(widget)
+            if widget:getText() == "Join" then return widget end
+            for _, child in ipairs(widget:getChildren()) do
+              local result = findJoinButtonByLabel(child)
+              if result then return result end
+            end
+            return nil
+          end
+          local joinButton = findJoinButtonByLabel(root)
+          if not joinButton or not joinButton:isEnabled() then return end
+          joinButton:focus()
+          joinButton:onClick()
+          currentChannel = currentChannel % 3 + 1
+        end
+      end)
+    end
+  end
+end)
+
+local currentIndex = 1
+local currentNick = ""
+local currentPZIndex = 1
+local currentPZNick = ""
+
+function sendDiscordMessage(message, targetWebhook)
+    local dataSend = {content = message}
+    HTTP.postJSON(targetWebhook, dataSend, function(data, err)
+        if err then print("Discord Webhook Error: " .. err) else print("Message sent to Discord") end
+    end)
+end
+
+local pzcheck = macro(3000, "PZ Check", function()
+    queryPZEnemy()
+end)
+
+function checkLocation(position)
+    for _, loc in ipairs(locations) do
+        if math.abs(position.x - loc.x) <= 1 and math.abs(position.y - loc.y) <= 1 then 
+            return true 
+        end
+    end
+    return false
+end
+
+macro(10, function()
+    local myPosition = player:getPosition()
+    if checkLocation(myPosition) then
+        queryEnemy()
+    end
+    delay(1100)
+end)
+
+function queryPZEnemy()
+    -- Zabezpieczenie na pusta liste z Gista
+    if #PZexiva == 0 then return end
+    currentPZNick = PZexiva[currentPZIndex]
+    if currentPZNick then
+        say("!where " .. currentPZNick)
+    end
+    currentPZIndex = currentPZIndex + 1
+    if currentPZIndex > #PZexiva then
+        CaveBot.setOn()
+        pzcheck.setOff()
+        currentPZIndex = 1 
+        return 
+    end
+end
+
+function queryEnemy()
+    if #enemiesexiva == 0 then return end
+    currentNick = enemiesexiva[currentIndex]
+    if not currentNick then return end
+    say('exiva "' .. currentNick)
+    currentIndex = currentIndex + 1
+    if currentIndex > #enemiesexiva then
+        CaveBot.setOn(true)
+        currentIndex = 1 
+        return 
+    end
+end
+
+onLoginAdvice(function(message)
+    for _, rootW in pairs(g_ui.getRootWidget():getChildren()) do
+        if rootW:getText() == "For Your Information" then
+            local body = rootW:getChildByIndex(1)
+            local content = body:getText()
+            for _, enemy in ipairs(PZexiva) do
+                if content:find(enemy .. " nie znajduje sie w PZ Zone.") then
+                    -- Zapobiegaj dublowaniu nickow w tablicy
+                    local exists = false
+                    for _, exivaNick in ipairs(enemiesexiva) do
+                        if exivaNick == enemy then exists = true break end
+                    end
+                    if not exists then table.insert(enemiesexiva, enemy) end
+                end
+            end
+            rootW:destroy()
+        end
+    end
+end)
+
+function removeEnemyFromList(enemy)
+    for index, name in ipairs(enemiesexiva) do
+        if name == enemy then
+            table.remove(enemiesexiva, index)
+            if index <= currentIndex then
+                currentIndex = currentIndex - 1
+            end
+            return
+        end
+    end
+end
+
+onTextMessage(function(mode, text)
+    local myPosition = player:getPosition()
+    local directions = {"is to the east", "is to the west", "is to the north", "is to the south", "is to the south-east", "is to the south-west", "is to the north-east", "is to the north-west", "is on a lower level to the east", "is on a lower level to the west", "is on a lower level to the north", "is on a lower level to the south", "is on a lower level to the north-east", "is on a lower level to the north-west", "is on a lower level to the south-east", "is on a lower level to the south-west", "is on a higher level to the east", "is on a higher level to the west", "is on a higher level to the north", "is on a higher level to the south", "is on a higher level to the north-east", "is on a higher level to the north-west", "is on a higher level to the south-east", "is on a higher level to the south-west"}
+    for _, dir in ipairs(directions) do
+        if text:find(dir) then
+            for _, loc in ipairs(locations) do
+                if myPosition.x == loc.x and myPosition.y == loc.y and myPosition.z == loc.z then
+                    -- Przekazanie odpowiedniego webhooka w zaleznosci od lokacji
+                    sendDiscordMessage("**" .. currentNick .. "** is at **" .. loc.name .. "**", loc.webhook)
+                    removeEnemyFromList(currentNick)
+                    break
+                end
+            end
+            break
+        end
+    end
+end)
+
+-- Koordynaty restartu dla 5k, 4k i Waleriana
+local restartWalkPos = {
+    {x = 7034, y = 5907, z = 7}, -- 5k
+    {x = 6173, y = 6111, z = 5}, -- 4k
+    {x = 3221, y = 2802, z = 5}  -- Walerian
+}
+
+local restartPzPos = {
+    {x = 7033, y = 5907, z = 7}, -- 5k
+    {x = 6172, y = 6111, z = 5}, -- 4k
+    {x = 3220, y = 2802, z = 5}  -- Walerian
+}
+
+local function isAtPosition(pos, posList)
+    for _, p in ipairs(posList) do
+        if pos.x == p.x and pos.y == p.y and pos.z == p.z then return true end
+    end
+    return false
+end
+
+macro(500, function()
+    local p = player:getPosition()
+    if CaveBot.isOff() then
+        if isAtPosition(p, restartWalkPos) then
+            enemiesexiva = {}
+            g_game.walk(3)
+            delay(1000)
+        elseif isAtPosition(p, restartPzPos) then
+            pzcheck.setOn()        
+        end
+    end
+end)
+
+macro(500, "Pot na mane", function()
+    if manapercent() < 85 then
+        useWith(238, player)
+    end
+end)
+
+local cavebotDisabledTime = nil
+local isCaveBotDisabled = false
+
+macro(1000, function()
+    if CaveBot.isOff() and not isCaveBotDisabled then
+        isCaveBotDisabled = true
+        cavebotDisabledTime = os.time()
+    elseif not CaveBot.isOff() then
+        isCaveBotDisabled = false
+        cavebotDisabledTime = nil
+    end
+
+    if isCaveBotDisabled and cavebotDisabledTime then
+        if os.difftime(os.time(), cavebotDisabledTime) > 360 then
+            CaveBot.setOn(true)
+            isCaveBotDisabled = false
+            cavebotDisabledTime = nil
+        end
+    end
+end)
